@@ -1,4 +1,4 @@
-import { Upload, FileJson, AlertCircle } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, Loader2 } from 'lucide-react';
 import JSZip from 'jszip';
 import { useState, useRef } from 'react';
 import { UploadedFile, ScanReport } from '../types/vulnerability';
@@ -10,21 +10,24 @@ interface FileUploadProps {
 
 // Get backend URL from environment or use default
 const getBackendUrl = () => {
-  // Check for Vite environment variables
   const viteUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_BASEAPP_URL;
   if (viteUrl) {
-    return viteUrl.replace(/\/$/, ''); // Remove trailing slash
+    return viteUrl.replace(/\/$/, '');
   }
-  
-  // Default to Render deployment URL
-  // When deploying, update this to your actual backend URL
   return 'https://codeglia.onrender.com';
 };
+
+interface ProgressState {
+  status: string;
+  message: string;
+  progress: number;
+}
 
 export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [progressState, setProgressState] = useState<ProgressState | null>(null);
   const [groundTruthFile, setGroundTruthFile] = useState<File | null>(null);
   const [enableAI, setEnableAI] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -63,8 +66,7 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
 
     if (archives.length > 0 && onReportGenerated) {
       try {
-        const report = await uploadArchiveToBackend(archives[0]);
-        onReportGenerated(report);
+        await uploadArchiveToBackendStreaming(archives[0]);
         return;
       } catch (err: any) {
         setError(err?.message || 'Failed to process archive with backend.');
@@ -91,7 +93,6 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
       if (isArchive(f.name)) {
         archives.push(f);
       } else {
-        // Detect optional ground truth by filename
         if (isGroundTruth(f.name)) {
           setGroundTruthFile(f);
         } else {
@@ -102,8 +103,7 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
 
     if (archives.length > 0 && onReportGenerated) {
       try {
-        const report = await uploadArchiveToBackend(archives[0]);
-        onReportGenerated(report);
+        await uploadArchiveToBackendStreaming(archives[0]);
         return;
       } catch (err: any) {
         setError(err?.message || 'Failed to process archive with backend.');
@@ -148,8 +148,10 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     return lower.includes('ground') || lower.includes('truth') || lower.includes('labels');
   };
 
-  const uploadArchiveToBackend = async (file: File): Promise<ScanReport> => {
+  const uploadArchiveToBackendStreaming = async (file: File): Promise<void> => {
     setIsUploading(true);
+    setProgressState({ status: 'uploading', message: 'Uploading file...', progress: 0 });
+    
     const form = new FormData();
     form.append('file', file);
     if (groundTruthFile) {
@@ -158,11 +160,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     if (enableAI) {
       form.append('ai', '1');
     }
+    form.append('streaming', '1'); // Enable streaming
     
     const backendUrl = getBackendUrl();
     const apiUrl = `${backendUrl}/api/scan`;
     
-    console.log('Uploading to:', apiUrl);
+    console.log('Streaming upload to:', apiUrl);
     console.log('File size:', file.size, 'bytes');
     
     try {
@@ -172,13 +175,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         mode: 'cors',
         credentials: 'omit',
         headers: {
-          'Accept': 'application/json',
+          'Accept': 'text/event-stream',
         },
       });
       
-      const text = await res.text();
-      
       if (!res.ok) {
+        const text = await res.text();
         let errorMsg = `Server error: ${res.status} ${res.statusText}`;
         try {
           const errorData = JSON.parse(text);
@@ -186,14 +188,70 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         } catch {}
         throw new Error(errorMsg);
       }
+
+      // Process Server-Sent Events stream
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
       
-      const data = JSON.parse(text);
-      console.log('Scan completed successfully');
-      return data as ScanReport;
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      let buffer = '';
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('Stream complete');
+          break;
+        }
+        
+        buffer += decoder.decode(value, { stream: true });
+        
+        // Process complete messages
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.error) {
+                throw new Error(parsed.error);
+              }
+              
+              if (parsed.status === 'complete' && parsed.result) {
+                console.log('Scan completed successfully');
+                setProgressState({ status: 'complete', message: 'Scan complete!', progress: 100 });
+                setTimeout(() => {
+                  if (onReportGenerated) {
+                    onReportGenerated(parsed.result as ScanReport);
+                  }
+                  setIsUploading(false);
+                  setProgressState(null);
+                }, 500);
+              } else if (parsed.status) {
+                setProgressState({
+                  status: parsed.status,
+                  message: parsed.message || 'Processing...',
+                  progress: parsed.progress || 0
+                });
+              }
+            } catch (parseErr) {
+              console.error('Failed to parse SSE message:', data, parseErr);
+            }
+          }
+        }
+      }
+      
     } catch (err: any) {
       console.error('Upload error:', err);
+      setIsUploading(false);
+      setProgressState(null);
       
-      // Provide more specific error messages
       if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
         throw new Error(
           `Cannot connect to backend server at ${apiUrl}.\n\n` +
@@ -203,22 +261,11 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
           `3. Network/firewall issues\n\n` +
           `Please check:\n` +
           `- Backend is deployed and running at ${backendUrl}\n` +
-          `- Backend health endpoint: ${backendUrl}/health\n` +
-          `- Check browser console for CORS errors`
-        );
-      }
-      
-      if (err.message.includes('CORS')) {
-        throw new Error(
-          `CORS error: Backend server needs to allow requests from this origin.\n\n` +
-          `Backend URL: ${backendUrl}\n` +
-          `Make sure the backend has proper CORS configuration.`
+          `- Backend health endpoint: ${backendUrl}/health`
         );
       }
       
       throw err;
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -300,11 +347,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
             const items = e.target.files;
             if (!items) return;
             try {
+              setProgressState({ status: 'zipping', message: 'Compressing folder...', progress: 5 });
               const archive = await zipDirectory(items);
-              const report = await uploadArchiveToBackend(archive);
-              onReportGenerated && onReportGenerated(report);
+              await uploadArchiveToBackendStreaming(archive);
             } catch (err: any) {
               setError(err?.message || 'Failed to compress and upload folder.');
+              setProgressState(null);
             }
           }}
           className="hidden"
@@ -314,7 +362,7 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         <div className="flex flex-col items-center gap-4">
           <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full">
             {isUploading ? (
-              <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              <Loader2 className="w-12 h-12 text-white animate-spin" />
             ) : (
               <Upload className="w-12 h-12 text-white" />
             )}
@@ -364,7 +412,7 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
                 onChange={(e) => setEnableAI(e.target.checked)}
                 disabled={isUploading}
               />
-              <span className="text-slate-700 font-semibold">Enrich with Gemini (if configured)</span>
+              <span className="text-slate-700 font-semibold">Enrich with Gemini (top 5 critical/high)</span>
             </label>
             {groundTruthFile && (
               <span className="text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
@@ -379,6 +427,32 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         </div>
       </div>
 
+      {/* Real-time Progress Bar */}
+      {isUploading && progressState && (
+        <div className="mt-4 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-blue-900">
+                {progressState.message}
+              </span>
+              <span className="text-sm font-bold text-blue-900">
+                {progressState.progress}%
+              </span>
+            </div>
+            <div className="w-full bg-blue-100 rounded-full h-3 overflow-hidden">
+              <div 
+                className="bg-gradient-to-r from-blue-600 to-purple-600 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progressState.progress}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-blue-700">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Status: <strong>{progressState.status}</strong></span>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -386,14 +460,6 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
             <p className="text-red-800 font-semibold">Upload Error</p>
             <pre className="text-red-600 text-sm whitespace-pre-wrap mt-2 font-mono">{error}</pre>
           </div>
-        </div>
-      )}
-      
-      {isUploading && (
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-800 font-semibold text-center">
-            Processing your upload... This may take a few minutes for large codebases.
-          </p>
         </div>
       )}
     </div>
