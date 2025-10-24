@@ -14,9 +14,11 @@ import re
 import csv
 import requests
 import traceback
-
 from flask import Flask, jsonify, request
+
 from flask_cors import CORS
+CORS(app, origins=["https://codeglia.vercel.app"])
+
 import subprocess
 
 
