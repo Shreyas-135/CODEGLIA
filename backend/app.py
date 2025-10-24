@@ -17,12 +17,10 @@ import traceback
 from flask import Flask, jsonify, request
 
 from flask_cors import CORS
+app = Flask(__name__)
 CORS(app, origins=["https://codeglia.vercel.app"])
 
 import subprocess
-
-
-app = Flask(__name__)
 
 # Enhanced CORS configuration
 CORS(app, 
