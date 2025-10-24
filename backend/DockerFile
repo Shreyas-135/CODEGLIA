@@ -1,27 +1,13 @@
-# Use a small, modern Python base
 FROM python:3.11-slim
 
-# Create working directory
 WORKDIR /app
-
-# Install system deps (git for repo scanning)
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-# Copy app files
 COPY . .
 
-# Install Python dependencies
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir semgrep bandit flask flask-cors gunicorn
 
-# Install Semgrep and Bandit CLI tools
-RUN pip install --no-cache-dir semgrep bandit gunicorn flask-cors
-
-# Expose Render's dynamic port
 EXPOSE 10000
-
-# Set environment variables
-ENV PORT=5000
-ENV PYTHONUNBUFFERED=1
-
-# Start Gunicorn server
+ENV PORT=10000
 CMD ["gunicorn", "backend.app:app", "--bind", "0.0.0.0:$PORT"]
+
