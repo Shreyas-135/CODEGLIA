@@ -8,16 +8,17 @@ interface FileUploadProps {
   onReportGenerated?: (report: ScanReport) => void;
 }
 
-// Get backend URL from environment or use relative path
+// Get backend URL from environment or use default
 const getBackendUrl = () => {
-  // Check for Vite environment variable
+  // Check for Vite environment variables
   const viteUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_BASEAPP_URL;
   if (viteUrl) {
     return viteUrl.replace(/\/$/, ''); // Remove trailing slash
   }
   
-  // Use relative path if no environment variable
-  return '';
+  // Default to Render deployment URL
+  // When deploying, update this to your actual backend URL
+  return 'https://codeglia.onrender.com';
 };
 
 export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadProps) {
@@ -162,16 +163,20 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     const apiUrl = `${backendUrl}/api/scan`;
     
     console.log('Uploading to:', apiUrl);
+    console.log('File size:', file.size, 'bytes');
     
     try {
       const res = await fetch(apiUrl, {
         method: 'POST',
         body: form,
-        // Add headers for CORS if needed
+        mode: 'cors',
+        credentials: 'omit',
         headers: {
           'Accept': 'application/json',
         },
       });
+      
+      console.log('Response status:', res.status);
       
       if (!res.ok) {
         let errorMsg = `Server error: ${res.status} ${res.statusText}`;
@@ -179,19 +184,45 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
           const errorData = await res.json();
           errorMsg = errorData.error || errorMsg;
         } catch {
-          const text = await res.text();
-          errorMsg = text || errorMsg;
+          try {
+            const text = await res.text();
+            errorMsg = text || errorMsg;
+          } catch {
+            // Use default error message
+          }
         }
         throw new Error(errorMsg);
       }
       
       const data = await res.json();
+      console.log('Scan completed successfully');
       return data as ScanReport;
     } catch (err: any) {
       console.error('Upload error:', err);
+      
+      // Provide more specific error messages
       if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        throw new Error(`Cannot connect to backend server at ${apiUrl}. Please ensure the backend is running.`);
+        throw new Error(
+          `Cannot connect to backend server at ${apiUrl}.\n\n` +
+          `Possible issues:\n` +
+          `1. Backend server is not running or not accessible\n` +
+          `2. CORS is blocking the request\n` +
+          `3. Network/firewall issues\n\n` +
+          `Please check:\n` +
+          `- Backend is deployed and running at ${backendUrl}\n` +
+          `- Backend health endpoint: ${backendUrl}/health\n` +
+          `- Check browser console for CORS errors`
+        );
       }
+      
+      if (err.message.includes('CORS')) {
+        throw new Error(
+          `CORS error: Backend server needs to allow requests from this origin.\n\n` +
+          `Backend URL: ${backendUrl}\n` +
+          `Make sure the backend has proper CORS configuration.`
+        );
+      }
+      
       throw err;
     } finally {
       setIsUploading(false);
@@ -209,6 +240,40 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     }
     const content = await zip.generateAsync({ type: 'uint8array' });
     return new File([content], 'source.zip', { type: 'application/zip' });
+  };
+
+  const testBackendConnection = async () => {
+    const backendUrl = getBackendUrl();
+    setError(null);
+    setIsUploading(true);
+    
+    try {
+      const healthUrl = `${backendUrl}/health`;
+      console.log('Testing connection to:', healthUrl);
+      
+      const res = await fetch(healthUrl, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        alert(`✅ Backend is reachable!\n\nStatus: ${data.status}\nTime: ${data.time}`);
+      } else {
+        alert(`⚠️ Backend responded with error: ${res.status} ${res.statusText}`);
+      }
+    } catch (err: any) {
+      console.error('Connection test failed:', err);
+      alert(
+        `❌ Cannot connect to backend\n\n` +
+        `URL: ${backendUrl}/health\n` +
+        `Error: ${err.message}\n\n` +
+        `Please ensure the backend is running.`
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -283,6 +348,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
                 >
                   Upload Folder
                 </button>
+                <button
+                  onClick={testBackendConnection}
+                  className="ml-3 px-6 py-3 border-2 border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors font-semibold"
+                >
+                  Test Connection
+                </button>
               </>
             )}
           </div>
@@ -308,18 +379,19 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
               </span>
             )}
           </div>
+          
+          <div className="mt-2 text-xs text-slate-500">
+            Backend: {getBackendUrl()}
+          </div>
         </div>
       </div>
 
       {error && (
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <div>
+          <div className="flex-1">
             <p className="text-red-800 font-semibold">Upload Error</p>
-            <p className="text-red-600 text-sm">{error}</p>
-            <p className="text-red-500 text-xs mt-2">
-              Backend URL: {getBackendUrl() || '(relative path)'}/api/scan
-            </p>
+            <pre className="text-red-600 text-sm whitespace-pre-wrap mt-2 font-mono">{error}</pre>
           </div>
         </div>
       )}
