@@ -149,7 +149,8 @@ class ScanReport:
 def health():
     return jsonify({
         "status": "ok",
-        "time": datetime.utcnow().isoformat() + "Z"  
+        "time": datetime.utcnow().isoformat() + "Z" 
+    })
 
 @app.get("/")
 def root():
