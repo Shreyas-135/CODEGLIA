@@ -176,25 +176,18 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         },
       });
       
-      console.log('Response status:', res.status);
+      const text = await res.text();
       
       if (!res.ok) {
         let errorMsg = `Server error: ${res.status} ${res.statusText}`;
         try {
-          const errorData = await res.json();
+          const errorData = JSON.parse(text);
           errorMsg = errorData.error || errorMsg;
-        } catch {
-          try {
-            const text = await res.text();
-            errorMsg = text || errorMsg;
-          } catch {
-            // Use default error message
-          }
-        }
+        } catch {}
         throw new Error(errorMsg);
       }
       
-      const data = await res.json();
+      const data = JSON.parse(text);
       console.log('Scan completed successfully');
       return data as ScanReport;
     } catch (err: any) {
