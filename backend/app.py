@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Set
+import xml.etree.ElementTree as ET
 import re
 import csv
 import requests
@@ -182,6 +183,96 @@ def scan_archive():
                             _create_dep_vuln(application_name, rel, pkg, ver, vobj, "JavaScript", "osv")
                         )
 
+        # 3) Java: Maven and Gradle dependency scanning via OSV
+        # Maven pom.xml
+        maven_poms = _find_files(code_dir, {"pom.xml"})
+        for pom_path in maven_poms:
+            rel = _canonicalize_path(pom_path, code_dir)
+            pairs = _collect_maven_packages_from_pom(pom_path)
+            if pairs:
+                osv_map = _osv_query_batch("Maven", pairs)
+                for (name, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, name, ver, vobj, "Java", "osv")
+                        )
+
+        # Gradle lockfile and build files
+        gradle_lock_files = _find_files(code_dir, {"gradle.lockfile"})
+        for gl_path in gradle_lock_files:
+            rel = _canonicalize_path(gl_path, code_dir)
+            pairs = _collect_gradle_packages_from_lock(gl_path)
+            if pairs:
+                osv_map = _osv_query_batch("Maven", pairs)
+                for (name, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, name, ver, vobj, "Java", "osv")
+                        )
+
+        gradle_build_files = _find_files(code_dir, {"build.gradle", "build.gradle.kts"})
+        for gb_path in gradle_build_files:
+            rel = _canonicalize_path(gb_path, code_dir)
+            pairs = _collect_gradle_packages_from_build(gb_path)
+            if pairs:
+                osv_map = _osv_query_batch("Maven", pairs)
+                for (name, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, name, ver, vobj, "Java", "osv")
+                        )
+
+        # 4) C#: NuGet via packages.lock.json, packages.config, and .csproj
+        nuget_lock_files = _find_files(code_dir, {"packages.lock.json"})
+        for lock_path in nuget_lock_files:
+            rel = _canonicalize_path(lock_path, code_dir)
+            pairs = _collect_nuget_packages_from_lock(lock_path)
+            if pairs:
+                osv_map = _osv_query_batch("NuGet", pairs)
+                for (pkg, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, pkg, ver, vobj, "C#", "osv")
+                        )
+
+        nuget_configs = _find_files(code_dir, {"packages.config"})
+        for cfg_path in nuget_configs:
+            rel = _canonicalize_path(cfg_path, code_dir)
+            pairs = _collect_nuget_packages_from_config(cfg_path)
+            if pairs:
+                osv_map = _osv_query_batch("NuGet", pairs)
+                for (pkg, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, pkg, ver, vobj, "C#", "osv")
+                        )
+
+        # All .csproj files
+        csproj_files = _find_files_with_extensions(code_dir, {".csproj"})
+        for csproj in csproj_files:
+            rel = _canonicalize_path(csproj, code_dir)
+            pairs = _collect_nuget_packages_from_csproj(csproj)
+            if pairs:
+                osv_map = _osv_query_batch("NuGet", pairs)
+                for (pkg, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, pkg, ver, vobj, "C#", "osv")
+                        )
+
+        # 5) PHP: Composer via composer.lock
+        composer_locks = _find_files(code_dir, {"composer.lock"})
+        for cl_path in composer_locks:
+            rel = _canonicalize_path(cl_path, code_dir)
+            pairs = _collect_php_packages_from_composer_lock(cl_path)
+            if pairs:
+                osv_map = _osv_query_batch("Packagist", pairs)
+                for (pkg, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        vulns.append(
+                            _create_dep_vuln(application_name, rel, pkg, ver, vobj, "PHP", "osv")
+                        )
+
         # Optionally enrich with AI explanations/fixes
         if ai_enrich:
             try:
@@ -203,8 +294,8 @@ def scan_archive():
         for v in vulns:
             severity_counts[v.severity] = severity_counts.get(v.severity, 0) + 1
 
-        # Compute metrics - prefer ground truth if provided
-        metrics = _calculate_metrics(len(vulns))
+        # Compute metrics only when ground truth is provided; otherwise omit metrics
+        metrics: Dict[str, float] = {}
         if ground_truth_upload:
             try:
                 gt_items = _parse_ground_truth(ground_truth_upload)
@@ -316,7 +407,7 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
         # semgrep exits 1 when findings present
         if process.returncode not in (0, 1):
             return None
-
+        return json.loads(process.stdout or "{}")
 
 # ----------------------
 # Dependency Scanning (Python/Node)
@@ -328,6 +419,17 @@ def _find_files(root_dir: str, names: Set[str]) -> List[str]:
         for f in files:
             if f in names:
                 paths.append(os.path.join(r, f))
+    return paths
+
+
+def _find_files_with_extensions(root_dir: str, extensions: Set[str]) -> List[str]:
+    paths: List[str] = []
+    for r, _, files in os.walk(root_dir):
+        for f in files:
+            for ext in extensions:
+                if f.lower().endswith(ext.lower()):
+                    paths.append(os.path.join(r, f))
+                    break
     return paths
 
 
@@ -518,6 +620,244 @@ def _osv_query_batch(ecosystem: str, pairs: List[Tuple[str, str]]) -> Dict[Tuple
     return results
 
 
+# ----------------------
+# Java (Maven/Gradle) dependency collection
+# ----------------------
+
+def _collect_maven_packages_from_pom(pom_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        tree = ET.parse(pom_path)
+        root = tree.getroot()
+        ns_uri = ""
+        if root.tag.startswith("{"):
+            ns_uri = root.tag.split("}")[0].strip("{")
+
+        def q(tag: str) -> str:
+            return f"{{{ns_uri}}}{tag}" if ns_uri else tag
+
+        # Resolve properties for version placeholders
+        properties: Dict[str, str] = {}
+        props_node = root.find(q("properties"))
+        if props_node is not None:
+            for child in list(props_node):
+                key = child.tag.split("}")[-1]
+                val = (child.text or "").strip()
+                if key and val:
+                    properties[key] = val
+
+        for dep in root.findall(f".//{q('dependency')}"):
+            gid = (dep.find(q("groupId")).text if dep.find(q("groupId")) is not None else "").strip()
+            aid = (dep.find(q("artifactId")).text if dep.find(q("artifactId")) is not None else "").strip()
+            ver = (dep.find(q("version")).text if dep.find(q("version")) is not None else "").strip()
+            if not gid or not aid or not ver:
+                continue
+            # handle ${...} properties
+            if ver.startswith("${") and ver.endswith("}"):
+                prop_key = ver[2:-1]
+                ver = properties.get(prop_key, ver)
+            name = f"{gid}:{aid}"
+            pairs.append((name, ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+def _collect_gradle_packages_from_lock(lock_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        with open(lock_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                # format: group:artifact:version=...
+                if ":" in s:
+                    left = s.split("=")[0].strip()
+                    parts = left.split(":")
+                    if len(parts) >= 3:
+                        gid, aid, ver = parts[0], parts[1], parts[2]
+                        pairs.append((f"{gid}:{aid}", ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+def _collect_gradle_packages_from_build(build_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        with open(build_path, "r", encoding="utf-8", errors="ignore") as f:
+            text = f.read()
+        # Matches implementation 'group:artifact:version' and implementation("group:artifact:version")
+        pattern = r"(?m)\b(?:implementation|api|compile|testImplementation|runtimeOnly)\s*[\(\s]*['\"]([^:'\"]+):([^:'\"]+):([^'\"]+)['\"]\)?"
+        for m in re.finditer(pattern, text):
+            gid, aid, ver = m.group(1).strip(), m.group(2).strip(), m.group(3).strip()
+            if gid and aid and ver:
+                pairs.append((f"{gid}:{aid}", ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+# ----------------------
+# C# / NuGet dependency collection
+# ----------------------
+
+def _collect_nuget_packages_from_lock(lock_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        with open(lock_path, "r", encoding="utf-8", errors="ignore") as f:
+            data = json.load(f)
+        deps = data.get("dependencies") or {}
+        # Values are usually frameworks mapping to packages
+        def walk(obj: dict):
+            for _, inner in (obj or {}).items():
+                if isinstance(inner, dict):
+                    for name, meta in inner.items():
+                        if isinstance(meta, dict):
+                            ver = meta.get("resolved") or meta.get("version")
+                            if name and ver:
+                                pairs.append((name, ver))
+        if isinstance(deps, dict):
+            walk(deps)
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+def _collect_nuget_packages_from_config(config_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        tree = ET.parse(config_path)
+        root = tree.getroot()
+        for pkg in root.findall("package"):
+            name = (pkg.get("id") or "").strip()
+            ver = (pkg.get("version") or "").strip()
+            if name and ver:
+                pairs.append((name, ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+def _collect_nuget_packages_from_csproj(csproj_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        tree = ET.parse(csproj_path)
+        root = tree.getroot()
+        # Handle default namespace if present
+        ns_uri = ""
+        if root.tag.startswith("{"):
+            ns_uri = root.tag.split("}")[0].strip("{")
+
+        def q(tag: str) -> str:
+            return f"{{{ns_uri}}}{tag}" if ns_uri else tag
+
+        for pr in root.findall(f".//{q('PackageReference')}"):
+            name = (pr.get("Include") or pr.get("Update") or "").strip()
+            ver = (pr.get("Version") or "").strip()
+            if not ver:
+                v_node = pr.find(q("Version"))
+                if v_node is not None:
+                    ver = (v_node.text or "").strip()
+            if name and ver:
+                pairs.append((name, ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
+# ----------------------
+# PHP / Composer dependency collection
+# ----------------------
+
+def _strip_version_prefix(ver: str) -> str:
+    if not ver:
+        return ver
+    return ver[1:] if ver.startswith("v") and len(ver) > 1 else ver
+
+
+def _collect_php_packages_from_composer_lock(lock_path: str) -> List[Tuple[str, str]]:
+    pairs: List[Tuple[str, str]] = []
+    try:
+        with open(lock_path, "r", encoding="utf-8", errors="ignore") as f:
+            data = json.load(f)
+        for key in ("packages", "packages-dev"):
+            arr = data.get(key) or []
+            if isinstance(arr, list):
+                for p in arr:
+                    name = (p.get("name") or "").strip()
+                    ver = _strip_version_prefix((p.get("version") or "").strip())
+                    if name and ver:
+                        pairs.append((name, ver))
+    except Exception:
+        return []
+    # Deduplicate
+    seen: Set[Tuple[str, str]] = set()
+    uniq: List[Tuple[str, str]] = []
+    for n, v in pairs:
+        key = (n, v)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append((n, v))
+    return uniq
+
+
 def _cvss_to_severity(score_str: Optional[str]) -> str:
     try:
         if not score_str:
@@ -573,11 +913,7 @@ def _create_dep_vuln(app_name: str, manifest_rel: str, pkg_name: str, pkg_versio
         tool=tool,
         confidenceLevel=None,
     )
-        return json.loads(process.stdout or "{}")
-    except FileNotFoundError:
-        return None
-    except Exception:
-        return None
+
 
 
 def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerability]:

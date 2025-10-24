@@ -10,7 +10,9 @@ export function generateExcelReport(report: ScanReport, startupName: string): vo
     CVE: vuln.cve || vuln.cwe || 'N/A',
     'File Name': vuln.fileName,
     'Line of Code': vuln.lineOfCode,
-    'Detection Accuracy': report.f1Score ? `${(report.f1Score * 100).toFixed(2)}%` : 'N/A'
+    'Detection Accuracy': report.f1Score != null
+      ? `${(report.f1Score * 100).toFixed(2)}%`
+      : (report.detectionAccuracy != null ? `${(report.detectionAccuracy * 100).toFixed(2)}%` : 'N/A')
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(excelData);
@@ -68,7 +70,9 @@ export function generateCSVReport(report: ScanReport): string {
     vuln.cve || vuln.cwe || 'N/A',
     vuln.fileName,
     vuln.lineOfCode,
-    report.f1Score ? `${(report.f1Score * 100).toFixed(2)}%` : 'N/A'
+    report.f1Score != null
+      ? `${(report.f1Score * 100).toFixed(2)}%`
+      : (report.detectionAccuracy != null ? `${(report.detectionAccuracy * 100).toFixed(2)}%` : 'N/A')
   ]);
 
   const csvContent = [
