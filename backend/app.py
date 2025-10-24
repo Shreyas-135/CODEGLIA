@@ -33,12 +33,6 @@ CORS(app,
          "max_age": 3600
      }})
 
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({
-        "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat()
-    })
 
 # Comprehensive after_request handler
 @app.after_request
@@ -140,10 +134,12 @@ class ScanReport:
     recall: Optional[float] = None
 
 
-@app.get("/health")
+@app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "time": datetime.utcnow().isoformat() + "Z"})
-
+    return jsonify({
+        "status": "ok",
+        "time": datetime.datetime.utcnow().isoformat()
+    })
 
 @app.get("/")
 def root():
