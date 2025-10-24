@@ -44,23 +44,29 @@ def after_request(response):
     return response
 
 # Handle OPTIONS requests explicitly
-@app.route('/api/scan', methods=['GET', 'POST', 'OPTIONS'])
+@app.route("/api/scan", methods=["POST", "OPTIONS"])
 def scan():
-    if request.method == 'OPTIONS':
-        response = jsonify({'status': 'ok'})
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Accept,Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
-        return response, 200
-    
-    elif request.method == 'GET':
-        # Example GET response
-        return jsonify({'message': 'This is a GET response'}), 200
-    
-    elif request.method == 'POST':
-        data = request.get_json()
-        # Process your data here
-        return jsonify({'received': data}), 200
+    if request.method == "OPTIONS":
+        return '', 204
+
+    # Ensure a file was uploaded
+    if 'file' not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+
+    file = request.files['file']
+    ground_truth = request.files.get('ground_truth')
+    ai_enabled = request.form.get('ai') == '1'
+
+    # TODO: Insert your scanning logic here
+    # For demo, we just return file names and flags
+    response = {
+        "filename": file.filename,
+        "ground_truth": ground_truth.filename if ground_truth else None,
+        "ai_enabled": ai_enabled,
+        "message": "Scan received successfully"
+    }
+
+    return jsonify(response), 200
 
 
 
