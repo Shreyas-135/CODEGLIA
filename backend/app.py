@@ -18,7 +18,7 @@ from flask import Flask, jsonify, request
 
 from flask_cors import CORS
 app = Flask(__name__)
-CORS(app, origins=["https://codeglia.vercel.app"])
+CORS(app, origins="*")
 
 import subprocess
 
@@ -44,13 +44,24 @@ def after_request(response):
     return response
 
 # Handle OPTIONS requests explicitly
-@app.route('/api/scan', methods=['OPTIONS'])
-def options_scan():
-    response = jsonify({'status': 'ok'})
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Accept,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
-    return response, 200
+@app.route('/api/scan', methods=['GET', 'POST', 'OPTIONS'])
+def scan():
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Accept,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+        return response, 200
+    
+    elif request.method == 'GET':
+        # Example GET response
+        return jsonify({'message': 'This is a GET response'}), 200
+    
+    elif request.method == 'POST':
+        data = request.get_json()
+        # Process your data here
+        return jsonify({'received': data}), 200
+
 
 
 SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
@@ -138,8 +149,7 @@ class ScanReport:
 def health():
     return jsonify({
         "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat()
-    })
+        "time": datetime.utcnow().isoformat() + "Z"  
 
 @app.get("/")
 def root():
