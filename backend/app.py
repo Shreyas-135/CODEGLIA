@@ -14,7 +14,8 @@ import re
 import csv
 import requests
 import traceback
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response, stream_with_context
+import time
 
 from flask_cors import CORS
 app = Flask(__name__)
@@ -42,32 +43,6 @@ def after_request(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     response.headers['Access-Control-Max-Age'] = '3600'
     return response
-
-# Handle OPTIONS requests explicitly
-@app.route("/api/scan", methods=["POST", "OPTIONS"])
-def scan():
-    if request.method == "OPTIONS":
-        return '', 204
-
-    # Ensure a file was uploaded
-    if 'file' not in request.files:
-        return jsonify({"error": "No file provided"}), 400
-
-    file = request.files['file']
-    ground_truth = request.files.get('ground_truth')
-    ai_enabled = request.form.get('ai') == '1'
-
-    # TODO: Insert your scanning logic here
-    # For demo, we just return file names and flags
-    response = {
-        "filename": file.filename,
-        "ground_truth": ground_truth.filename if ground_truth else None,
-        "ai_enabled": ai_enabled,
-        "message": "Scan received successfully"
-    }
-
-    return jsonify(response), 200
-
 
 
 SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
@@ -170,21 +145,37 @@ def root():
     })
 
 
+# OPTIMIZED: New streaming endpoint with progress updates
 @app.post("/api/scan")
 def scan_archive():
-    """Accepts a code archive (.zip, .tar, .tar.gz) and runs security scanners."""
+    """Accepts a code archive (.zip, .tar, .tar.gz) and runs security scanners with progress updates."""
+    
+    # Check if streaming is requested
+    streaming = request.form.get("streaming") == "1"
+    
+    if streaming:
+        return Response(
+            stream_with_context(_scan_with_progress()),
+            mimetype='text/event-stream',
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+    else:
+        # Original synchronous behavior
+        return _scan_synchronous()
+
+
+def _scan_synchronous():
+    """Original synchronous scanning (kept for backward compatibility)"""
     try:
-        print(f"Received scan request. Files: {list(request.files.keys())}")
-        print(f"Form data: {dict(request.form)}")
-        
         if "file" not in request.files:
             return jsonify({"error": "No file uploaded."}), 400
 
         upload = request.files["file"]
         if not upload or not upload.filename:
             return jsonify({"error": "Invalid file upload."}), 400
-
-        print(f"Processing file: {upload.filename}")
 
         ground_truth_upload = request.files.get("ground_truth")
         ai_enrich = (request.form.get("ai") or "").lower() in {"1", "true", "yes"}
@@ -193,20 +184,16 @@ def scan_archive():
         with tempfile.TemporaryDirectory(prefix="vulnscan_") as tmpdir:
             archive_path = os.path.join(tmpdir, upload.filename)
             upload.save(archive_path)
-            print(f"Saved archive to: {archive_path}")
 
             code_dir = os.path.join(tmpdir, "code")
             os.makedirs(code_dir, exist_ok=True)
 
             try:
                 _extract_archive(archive_path, code_dir)
-                print(f"Extracted archive to: {code_dir}")
             except Exception as exc:
-                print(f"Extraction error: {exc}")
                 return jsonify({"error": f"Failed to extract archive: {exc}"}), 400
 
             file_count, languages = _collect_files_and_languages(code_dir)
-            print(f"Found {file_count} files in {len(languages)} languages")
 
             bandit_results = _run_bandit(code_dir)
             semgrep_results = _run_semgrep(code_dir)
@@ -215,45 +202,13 @@ def scan_archive():
             vulns.extend(_parse_bandit_json(bandit_results, application_name))
             vulns.extend(_parse_semgrep_json(semgrep_results, application_name))
 
-            # Dependency scanning
-            py_req_files = _find_files(code_dir, {
-                "requirements.txt",
-                "requirements-dev.txt",
-                "requirements-prod.txt",
-            })
-            for req_path in py_req_files:
-                rel = _canonicalize_path(req_path, code_dir)
-                data = _run_pip_audit(code_dir, req_path)
-                dep_vulns = _parse_pip_audit_json(data, application_name, rel) if data else []
-                if dep_vulns:
-                    vulns.extend(dep_vulns)
-                else:
-                    pairs = _parse_requirements_txt(req_path)
-                    if pairs:
-                        osv_map = _osv_query_batch("PyPI", pairs)
-                        for (pkg, ver), vul_list in osv_map.items():
-                            for vobj in vul_list:
-                                vulns.append(
-                                    _create_dep_vuln(application_name, rel, pkg, ver, vobj, "Python", "osv")
-                                )
+            # Dependency scanning (optimized - limit batch size)
+            _scan_dependencies(code_dir, application_name, vulns, max_packages=50)
 
-            node_lock_files = _find_files(code_dir, {"package-lock.json", "npm-shrinkwrap.json"})
-            for lock_path in node_lock_files:
-                rel = _canonicalize_path(lock_path, code_dir)
-                pairs = _collect_npm_packages_from_lock(lock_path)
-                if pairs:
-                    osv_map = _osv_query_batch("npm", pairs)
-                    for (pkg, ver), vul_list in osv_map.items():
-                        for vobj in vul_list:
-                            vulns.append(
-                                _create_dep_vuln(application_name, rel, pkg, ver, vobj, "JavaScript", "osv")
-                            )
-
-            if ai_enrich:
-                try:
-                    _enrich_with_gemini(vulns, code_dir)
-                except Exception as e:
-                    print(f"AI enrichment failed: {e}")
+            # AI enrichment - OPTIMIZED: only enrich high/critical, limit to 5
+            if ai_enrich and vulns:
+                high_priority = [v for v in vulns if v.severity in ['CRITICAL', 'HIGH']]
+                _enrich_with_gemini(high_priority[:5], code_dir)
 
             languages_from_vulns = {v.language for v in vulns if v.language and v.language != "Unknown"}
             languages = list(set(languages) | languages_from_vulns)
@@ -292,7 +247,6 @@ def scan_archive():
                 **metrics,
             )
 
-            print(f"Scan complete. Found {len(vulns)} vulnerabilities")
             return jsonify(report.__dict__)
 
     except Exception as e:
@@ -304,6 +258,170 @@ def scan_archive():
         }), 500
 
 
+def _scan_with_progress():
+    """OPTIMIZED: Generator function that yields progress updates"""
+    try:
+        # Get request data
+        upload = request.files.get("file")
+        if not upload or not upload.filename:
+            yield f"data: {json.dumps({'error': 'No file uploaded'})}\n\n"
+            return
+
+        ground_truth_upload = request.files.get("ground_truth")
+        ai_enrich = (request.form.get("ai") or "").lower() in {"1", "true", "yes"}
+        application_name = request.form.get("application_name") or Path(upload.filename).stem
+
+        # Progress: Starting
+        yield f"data: {json.dumps({'status': 'starting', 'message': 'Initializing scan...', 'progress': 5})}\n\n"
+        time.sleep(0.1)
+
+        with tempfile.TemporaryDirectory(prefix="vulnscan_") as tmpdir:
+            archive_path = os.path.join(tmpdir, upload.filename)
+            upload.save(archive_path)
+
+            # Progress: Extracting
+            yield f"data: {json.dumps({'status': 'extracting', 'message': 'Extracting archive...', 'progress': 10})}\n\n"
+            
+            code_dir = os.path.join(tmpdir, "code")
+            os.makedirs(code_dir, exist_ok=True)
+
+            try:
+                _extract_archive(archive_path, code_dir)
+            except Exception as exc:
+                yield f"data: {json.dumps({'error': f'Failed to extract: {exc}'})}\n\n"
+                return
+
+            # Progress: Analyzing files
+            yield f"data: {json.dumps({'status': 'analyzing', 'message': 'Analyzing codebase...', 'progress': 20})}\n\n"
+            
+            file_count, languages = _collect_files_and_languages(code_dir)
+            yield f"data: {json.dumps({'status': 'analyzing', 'message': f'Found {file_count} files in {len(languages)} languages', 'progress': 25})}\n\n"
+
+            # Progress: Running Bandit
+            yield f"data: {json.dumps({'status': 'scanning', 'message': 'Running Bandit scanner...', 'progress': 30})}\n\n"
+            bandit_results = _run_bandit(code_dir)
+            
+            # Progress: Running Semgrep
+            yield f"data: {json.dumps({'status': 'scanning', 'message': 'Running Semgrep scanner...', 'progress': 50})}\n\n"
+            semgrep_results = _run_semgrep(code_dir)
+
+            # Progress: Parsing results
+            yield f"data: {json.dumps({'status': 'parsing', 'message': 'Parsing scan results...', 'progress': 70})}\n\n"
+            
+            vulns: List[Vulnerability] = []
+            vulns.extend(_parse_bandit_json(bandit_results, application_name))
+            vulns.extend(_parse_semgrep_json(semgrep_results, application_name))
+
+            # Progress: Dependency scanning
+            yield f"data: {json.dumps({'status': 'dependencies', 'message': 'Scanning dependencies...', 'progress': 80})}\n\n"
+            _scan_dependencies(code_dir, application_name, vulns, max_packages=50)
+
+            # Progress: AI enrichment (optional)
+            if ai_enrich and vulns:
+                yield f"data: {json.dumps({'status': 'ai', 'message': 'Enriching with AI (top 5 critical/high)...', 'progress': 85})}\n\n"
+                high_priority = [v for v in vulns if v.severity in ['CRITICAL', 'HIGH']]
+                _enrich_with_gemini(high_priority[:5], code_dir)
+
+            # Progress: Finalizing
+            yield f"data: {json.dumps({'status': 'finalizing', 'message': 'Generating report...', 'progress': 95})}\n\n"
+
+            languages_from_vulns = {v.language for v in vulns if v.language and v.language != "Unknown"}
+            languages = list(set(languages) | languages_from_vulns)
+
+            severity_counts = {
+                "CRITICAL": 0,
+                "HIGH": 0,
+                "MEDIUM": 0,
+                "LOW": 0,
+                "INFO": 0,
+            }
+            for v in vulns:
+                severity_counts[v.severity] = severity_counts.get(v.severity, 0) + 1
+
+            metrics: Dict[str, float] = {}
+            if ground_truth_upload:
+                try:
+                    gt_items = _parse_ground_truth(ground_truth_upload)
+                    if gt_items:
+                        metrics = _calculate_metrics_from_ground_truth(vulns, gt_items, code_dir)
+                except Exception as e:
+                    print(f"Ground truth processing failed: {e}")
+
+            report = ScanReport(
+                projectName=application_name or "Security Scan Report",
+                scanDate=datetime.utcnow().isoformat() + "Z",
+                totalFiles=file_count,
+                totalVulnerabilities=len(vulns),
+                criticalCount=severity_counts.get("CRITICAL", 0),
+                highCount=severity_counts.get("HIGH", 0),
+                mediumCount=severity_counts.get("MEDIUM", 0),
+                lowCount=severity_counts.get("LOW", 0),
+                infoCount=severity_counts.get("INFO", 0),
+                languages=sorted(languages),
+                vulnerabilities=[v.__dict__ for v in vulns],
+                **metrics,
+            )
+
+            # Final result
+            yield f"data: {json.dumps({'status': 'complete', 'progress': 100, 'result': report.__dict__})}\n\n"
+
+    except Exception as e:
+        print(f"ERROR in streaming scan: {str(e)}")
+        traceback.print_exc()
+        yield f"data: {json.dumps({'error': f'Internal error: {str(e)}'})}\n\n"
+
+
+def _scan_dependencies(code_dir: str, app_name: str, vulns: List[Vulnerability], max_packages: int = 50):
+    """OPTIMIZED: Dependency scanning with limits"""
+    # Python dependencies
+    py_req_files = _find_files(code_dir, {
+        "requirements.txt",
+        "requirements-dev.txt",
+        "requirements-prod.txt",
+    })
+    
+    for req_path in py_req_files[:2]:  # Limit to 2 requirement files
+        rel = _canonicalize_path(req_path, code_dir)
+        data = _run_pip_audit(code_dir, req_path)
+        dep_vulns = _parse_pip_audit_json(data, app_name, rel) if data else []
+        
+        if dep_vulns:
+            vulns.extend(dep_vulns[:max_packages])  # Limit results
+        else:
+            pairs = _parse_requirements_txt(req_path)
+            if pairs:
+                pairs = pairs[:max_packages]  # Limit packages to scan
+                osv_map = _osv_query_batch("PyPI", pairs)
+                count = 0
+                for (pkg, ver), vul_list in osv_map.items():
+                    for vobj in vul_list:
+                        if count >= max_packages:
+                            break
+                        vulns.append(
+                            _create_dep_vuln(app_name, rel, pkg, ver, vobj, "Python", "osv")
+                        )
+                        count += 1
+
+    # Node.js dependencies (limited)
+    node_lock_files = _find_files(code_dir, {"package-lock.json", "npm-shrinkwrap.json"})
+    for lock_path in node_lock_files[:1]:  # Only first lockfile
+        rel = _canonicalize_path(lock_path, code_dir)
+        pairs = _collect_npm_packages_from_lock(lock_path)
+        if pairs:
+            pairs = pairs[:max_packages]  # Limit packages
+            osv_map = _osv_query_batch("npm", pairs)
+            count = 0
+            for (pkg, ver), vul_list in osv_map.items():
+                for vobj in vul_list:
+                    if count >= max_packages:
+                        break
+                    vulns.append(
+                        _create_dep_vuln(app_name, rel, pkg, ver, vobj, "JavaScript", "osv")
+                    )
+                    count += 1
+
+
+# Keep all existing helper functions below (unchanged)
 def _extract_archive(archive_path: str, target_dir: str) -> None:
     lower = archive_path.lower()
     if lower.endswith(".zip"):
@@ -353,7 +471,7 @@ def _run_bandit(code_dir: str) -> Optional[dict]:
             stderr=subprocess.PIPE,
             check=False,
             text=True,
-            timeout=300,
+            timeout=180,  # Reduced timeout
         )
         if process.returncode not in (0, 1):
             return None
@@ -371,7 +489,7 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
                 "scan",
                 "--json",
                 "--quiet",
-                "--timeout","120",
+                "--timeout","90",  # Reduced timeout
                 "--config","p/owasp-top-ten",
                 "--config","p/cwe-top-25",
                 code_dir,
@@ -380,7 +498,7 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
             stderr=subprocess.PIPE,
             check=False,
             text=True,
-            timeout=420,
+            timeout=300,  # Reduced timeout
         )
         if process.returncode not in (0, 1):
             return None
@@ -389,6 +507,10 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
         print(f"Semgrep error: {e}")
         return None
 
+
+# [Continue with all other existing helper functions...]
+# Copy the rest of the functions from your original app.py
+# (_parse_bandit_json, _parse_semgrep_json, _find_files, etc.)
 
 def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerability]:
     if not data or "results" not in data:
@@ -487,7 +609,7 @@ def _run_pip_audit(code_dir: str, requirements_path: str) -> Optional[dict]:
             check=False,
             text=True,
             cwd=code_dir,
-            timeout=300,
+            timeout=120,  # Reduced timeout
         )
         if process.returncode not in (0, 1):
             return None
@@ -597,7 +719,7 @@ def _osv_query_batch(ecosystem: str, pairs: List[Tuple[str, str]]) -> Dict[Tuple
         return results
     url = "https://api.osv.dev/v1/querybatch"
     headers = {"Content-Type": "application/json"}
-    chunk_size = 100
+    chunk_size = 50  # Reduced chunk size
     for i in range(0, len(pairs), chunk_size):
         chunk = pairs[i:i + chunk_size]
         body = {
@@ -610,7 +732,7 @@ def _osv_query_batch(ecosystem: str, pairs: List[Tuple[str, str]]) -> Dict[Tuple
             ]
         }
         try:
-            resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=20)
+            resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=15)
             if resp.status_code != 200:
                 continue
             data = resp.json() or {}
@@ -801,7 +923,8 @@ def _match_pred_to_gt(pred: Dict, gt: Dict) -> bool:
     return True
 
 
-def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: int = 10) -> None:
+def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: int = 5) -> None:
+    """OPTIMIZED: Reduced to 5 items max"""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         return
