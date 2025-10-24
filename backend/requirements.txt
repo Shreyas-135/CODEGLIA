@@ -1,0 +1,4 @@
+Flask==3.0.3
+flask-cors==4.0.1
+bandit==1.7.10
+semgrep==1.94.0

@@ -14,6 +14,10 @@ function App() {
     setReport(scanReport);
   };
 
+  const handleReportFromBackend = (scanReport: ScanReport) => {
+    setReport(scanReport);
+  };
+
   const handleReset = () => {
     setReport(null);
   };
@@ -38,7 +42,7 @@ function App() {
         {!report ? (
           <>
             <CompetitionInfo />
-            <FileUpload onFilesUploaded={handleFilesUploaded} />
+            <FileUpload onFilesUploaded={handleFilesUploaded} onReportGenerated={handleReportFromBackend} />
           </>
         ) : (
           <Dashboard report={report} onReset={handleReset} />

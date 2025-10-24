@@ -52,8 +52,7 @@ export function generateExcelReport(report: ScanReport, startupName: string): vo
   summaryWorksheet['!cols'] = [{ wch: 25 }, { wch: 30 }];
   XLSX.utils.book_append_sheet(workbook, summaryWorksheet, 'Summary');
 
-  const timestamp = new Date().toISOString().split('T')[0];
-  const filename = `GC_PS_01_${startupName}_${timestamp}.xlsx`;
+  const filename = `GC_PS_01_${startupName}.xlsx`;
 
   XLSX.writeFile(workbook, filename);
 }
