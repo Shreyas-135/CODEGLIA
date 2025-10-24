@@ -1,12 +1,13 @@
 import { Upload, FileJson, AlertCircle } from 'lucide-react';
 import { useState, useRef } from 'react';
-import { UploadedFile } from '../types/vulnerability';
+import { UploadedFile, ScanReport } from '../types/vulnerability';
 
 interface FileUploadProps {
   onFilesUploaded: (files: UploadedFile[]) => void;
+  onReportGenerated?: (report: ScanReport) => void;
 }
 
-export function FileUpload({ onFilesUploaded }: FileUploadProps) {
+export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,13 +28,29 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
 
     const items = Array.from(e.dataTransfer.items);
     const files: UploadedFile[] = [];
+    const archives: File[] = [];
 
     for (const item of items) {
       if (item.kind === 'file') {
         const file = item.getAsFile();
         if (file) {
-          await processFile(file, files);
+          if (isArchive(file.name)) {
+            archives.push(file);
+          } else {
+            await processFile(file, files);
+          }
         }
+      }
+    }
+
+    if (archives.length > 0 && onReportGenerated) {
+      try {
+        const report = await uploadArchiveToBackend(archives[0]);
+        onReportGenerated(report);
+        return;
+      } catch (err: any) {
+        setError(err?.message || 'Failed to process archive with backend.');
+        return;
       }
     }
 
@@ -50,8 +67,25 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
     if (!fileList) return;
 
     const files: UploadedFile[] = [];
+    const archives: File[] = [];
     for (let i = 0; i < fileList.length; i++) {
-      await processFile(fileList[i], files);
+      const f = fileList[i];
+      if (isArchive(f.name)) {
+        archives.push(f);
+      } else {
+        await processFile(f, files);
+      }
+    }
+
+    if (archives.length > 0 && onReportGenerated) {
+      try {
+        const report = await uploadArchiveToBackend(archives[0]);
+        onReportGenerated(report);
+        return;
+      } catch (err: any) {
+        setError(err?.message || 'Failed to process archive with backend.');
+        return;
+      }
     }
 
     if (files.length > 0) {
@@ -76,6 +110,35 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
     }
   };
 
+  const isArchive = (name: string) => {
+    const lower = name.toLowerCase();
+    return (
+      lower.endsWith('.zip') ||
+      lower.endsWith('.tar') ||
+      lower.endsWith('.tgz') ||
+      lower.endsWith('.tar.gz')
+    );
+  };
+
+  const uploadArchiveToBackend = async (file: File): Promise<ScanReport> => {
+    const form = new FormData();
+    form.append('file', file);
+    try {
+      const res = await fetch('/api/scan', {
+        method: 'POST',
+        body: form
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Backend error');
+      }
+      const data = await res.json();
+      return data as ScanReport;
+    } catch (err) {
+      throw err as Error;
+    }
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto">
       <div
@@ -92,7 +155,7 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".json"
+          accept=".json,.zip,.tar,.tgz,.tar.gz"
           onChange={handleFileInput}
           className="hidden"
         />
@@ -104,10 +167,10 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
 
           <div>
             <h3 className="text-2xl font-bold text-slate-800 mb-2">
-              Upload Vulnerability Scan Results
+              Upload Vulnerability Scan Results or Source Archive
             </h3>
             <p className="text-slate-600 mb-4">
-              Drag and drop your JSON files here, or click to browse
+              Drag and drop JSON outputs (Bandit/Semgrep) or a .zip/.tar.gz of the source code
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -119,7 +182,7 @@ export function FileUpload({ onFilesUploaded }: FileUploadProps) {
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
             <FileJson className="w-5 h-5" />
-            <span>Supports Bandit, Semgrep, and custom JSON formats</span>
+            <span>Supports JSON (Bandit/Semgrep) and archives for Flask backend scanning</span>
           </div>
         </div>
       </div>

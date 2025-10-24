@@ -34,8 +34,7 @@ export function Dashboard({ report, onReset }: DashboardProps) {
 
   const handleDownloadCSV = () => {
     const csv = generateCSVReport(report);
-    const timestamp = new Date().toISOString().split('T')[0];
-    downloadCSV(csv, `GC_PS_01_${startupName}_${timestamp}.csv`);
+    downloadCSV(csv, `GC_PS_01_${startupName}.csv`);
   };
 
   const handleConfirmName = () => {
@@ -333,7 +332,7 @@ export function Dashboard({ report, onReset }: DashboardProps) {
               className="w-full px-4 py-3 border-2 border-slate-300 rounded-lg focus:border-blue-500 focus:outline-none font-semibold"
             />
             <p className="text-xs text-slate-500 mt-2">
-              File will be saved as: GC_PS_01_{startupName}_YYYY-MM-DD.xlsx
+              File will be saved as: GC_PS_01_{startupName}.xlsx
             </p>
             <div className="flex gap-3 mt-6">
               <button
