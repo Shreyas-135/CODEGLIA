@@ -22,22 +22,34 @@ import subprocess
 
 app = Flask(__name__)
 
-# Enable CORS for all routes - allows requests from any origin
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Accept"],
-    }
-})
+# Enhanced CORS configuration
+CORS(app, 
+     resources={r"/*": {
+         "origins": "*",
+         "methods": ["GET", "POST", "OPTIONS"],
+         "allow_headers": ["Content-Type", "Accept", "Authorization"],
+         "expose_headers": ["Content-Type"],
+         "supports_credentials": False,
+         "max_age": 3600
+     }})
 
-# Add after_request handler for additional CORS headers
+# Comprehensive after_request handler
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Accept')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Accept,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    response.headers['Access-Control-Max-Age'] = '3600'
     return response
+
+# Handle OPTIONS requests explicitly
+@app.route('/api/scan', methods=['OPTIONS'])
+def options_scan():
+    response = jsonify({'status': 'ok'})
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Accept,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
+    return response, 200
 
 
 SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
@@ -68,7 +80,6 @@ def _map_severity(value: Optional[str]) -> str:
     v = value.upper()
     if v in SEVERITY_ORDER:
         return v
-    # Map common tool severities
     if v in {"VERY-HIGH", "ERROR"}:
         return "CRITICAL"
     if v in {"HIGH", "WARNING"}:
@@ -141,10 +152,11 @@ def root():
 
 @app.post("/api/scan")
 def scan_archive():
-    """Accepts a code archive (.zip, .tar, .tar.gz) and runs security scanners.
-    Returns a unified JSON matching the frontend ScanReport type.
-    """
+    """Accepts a code archive (.zip, .tar, .tar.gz) and runs security scanners."""
     try:
+        print(f"Received scan request. Files: {list(request.files.keys())}")
+        print(f"Form data: {dict(request.form)}")
+        
         if "file" not in request.files:
             return jsonify({"error": "No file uploaded."}), 400
 
@@ -152,25 +164,29 @@ def scan_archive():
         if not upload or not upload.filename:
             return jsonify({"error": "Invalid file upload."}), 400
 
+        print(f"Processing file: {upload.filename}")
+
         ground_truth_upload = request.files.get("ground_truth")
         ai_enrich = (request.form.get("ai") or "").lower() in {"1", "true", "yes"}
         application_name = request.form.get("application_name") or Path(upload.filename).stem
 
-        # Create a temporary workspace
         with tempfile.TemporaryDirectory(prefix="vulnscan_") as tmpdir:
             archive_path = os.path.join(tmpdir, upload.filename)
             upload.save(archive_path)
+            print(f"Saved archive to: {archive_path}")
 
             code_dir = os.path.join(tmpdir, "code")
             os.makedirs(code_dir, exist_ok=True)
 
             try:
                 _extract_archive(archive_path, code_dir)
+                print(f"Extracted archive to: {code_dir}")
             except Exception as exc:
+                print(f"Extraction error: {exc}")
                 return jsonify({"error": f"Failed to extract archive: {exc}"}), 400
 
-            # Gather list of files
             file_count, languages = _collect_files_and_languages(code_dir)
+            print(f"Found {file_count} files in {len(languages)} languages")
 
             bandit_results = _run_bandit(code_dir)
             semgrep_results = _run_semgrep(code_dir)
@@ -201,7 +217,6 @@ def scan_archive():
                                     _create_dep_vuln(application_name, rel, pkg, ver, vobj, "Python", "osv")
                                 )
 
-            # Node dependencies
             node_lock_files = _find_files(code_dir, {"package-lock.json", "npm-shrinkwrap.json"})
             for lock_path in node_lock_files:
                 rel = _canonicalize_path(lock_path, code_dir)
@@ -214,10 +229,6 @@ def scan_archive():
                                 _create_dep_vuln(application_name, rel, pkg, ver, vobj, "JavaScript", "osv")
                             )
 
-            # Continue with other dependency scanning (Java, C#, PHP)...
-            # (Keep the rest of dependency scanning code from original)
-
-            # Optionally enrich with AI explanations/fixes
             if ai_enrich:
                 try:
                     _enrich_with_gemini(vulns, code_dir)
@@ -237,7 +248,6 @@ def scan_archive():
             for v in vulns:
                 severity_counts[v.severity] = severity_counts.get(v.severity, 0) + 1
 
-            # Compute metrics only when ground truth is provided
             metrics: Dict[str, float] = {}
             if ground_truth_upload:
                 try:
@@ -262,10 +272,10 @@ def scan_archive():
                 **metrics,
             )
 
+            print(f"Scan complete. Found {len(vulns)} vulnerabilities")
             return jsonify(report.__dict__)
 
     except Exception as e:
-        # Log the full traceback for debugging
         print(f"ERROR in /api/scan: {str(e)}")
         traceback.print_exc()
         return jsonify({
@@ -273,9 +283,6 @@ def scan_archive():
             "type": type(e).__name__
         }), 500
 
-
-# Keep all the helper functions from the original backend
-# (I'm omitting them here for brevity, but they should all be included)
 
 def _extract_archive(archive_path: str, target_dir: str) -> None:
     lower = archive_path.lower()
@@ -362,10 +369,6 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
         print(f"Semgrep error: {e}")
         return None
 
-
-# Include all other helper functions from original backend here
-# (_find_files, _run_pip_audit, _parse_pip_audit_json, etc.)
-# For brevity, I'm showing the pattern but you should include ALL functions
 
 def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerability]:
     if not data or "results" not in data:
