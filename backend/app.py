@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+import re
+import csv
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -115,6 +117,8 @@ def scan_archive():
         return jsonify({"error": "No file uploaded."}), 400
 
     upload = request.files["file"]
+    ground_truth_upload = request.files.get("ground_truth")
+    ai_enrich = (request.form.get("ai") or "").lower() in {"1", "true", "yes"}
     application_name = request.form.get("application_name") or Path(upload.filename).stem
 
     # Create a temporary workspace
@@ -140,6 +144,14 @@ def scan_archive():
         vulns.extend(_parse_bandit_json(bandit_results, application_name))
         vulns.extend(_parse_semgrep_json(semgrep_results, application_name))
 
+        # Optionally enrich with AI explanations/fixes
+        if ai_enrich:
+            try:
+                _enrich_with_gemini(vulns, code_dir)
+            except Exception:
+                # Best-effort enrichment; ignore failures
+                pass
+
         languages_from_vulns = {v.language for v in vulns if v.language and v.language != "Unknown"}
         languages = list(set(languages) | languages_from_vulns)
 
@@ -153,7 +165,16 @@ def scan_archive():
         for v in vulns:
             severity_counts[v.severity] = severity_counts.get(v.severity, 0) + 1
 
+        # Compute metrics - prefer ground truth if provided
         metrics = _calculate_metrics(len(vulns))
+        if ground_truth_upload:
+            try:
+                gt_items = _parse_ground_truth(ground_truth_upload)
+                if gt_items:
+                    metrics = _calculate_metrics_from_ground_truth(vulns, gt_items, code_dir)
+            except Exception:
+                # Fallback to default metrics if parsing fails
+                pass
 
         report = ScanReport(
             projectName=application_name or "Security Scan Report",
@@ -279,6 +300,12 @@ def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerabilit
             cwe = issue_cwe.get("id")
         elif isinstance(issue_cwe, str):
             cwe = issue_cwe
+        # Try to infer CWE/CVE from text fields when missing
+        if not cwe:
+            more_info = r.get("more_info") or ""
+            inferred_cwes = _extract_cwes_from_text(" ".join([issue_text or "", more_info]))
+            cwe = inferred_cwes[0] if inferred_cwes else None
+        inferred_cves = _extract_cves_from_text(issue_text or "")
 
         vulns.append(
             Vulnerability(
@@ -289,7 +316,7 @@ def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerabilit
                 vulnerabilityType=r.get("test_id") or r.get("issue_text") or "Unknown",
                 severity=severity,
                 cwe=cwe,
-                cve=r.get("cve"),
+                cve=r.get("cve") or (inferred_cves[0] if inferred_cves else None),
                 description=issue_text,
                 explanation=r.get("more_info"),
                 suggestedFix=r.get("fix") or r.get("recommendation"),
@@ -322,6 +349,16 @@ def _parse_semgrep_json(data: Optional[dict], app_name: str) -> List[Vulnerabili
             cwe = metadata.get("cwe") or metadata.get("cwe_id")
             if isinstance(cwe, list):
                 cwe = ", ".join(cwe)
+            # Try references for CWE/CVE
+            refs = metadata.get("references")
+            if refs:
+                refs_text = "\n".join(refs if isinstance(refs, list) else [str(refs)])
+                cwe_from_refs = _extract_cwes_from_text(refs_text)
+                cve_from_refs = _extract_cves_from_text(refs_text)
+                if not cwe and cwe_from_refs:
+                    cwe = ", ".join(cwe_from_refs)
+                if cve_from_refs:
+                    cve = cve_from_refs[0]
         rules = data.get("config_info", {})
         
         vulns.append(
@@ -360,6 +397,226 @@ def _calculate_metrics(tp_count: int) -> Dict[str, float]:
         "recall": recall,
         "detectionAccuracy": accuracy,
     }
+
+
+def _extract_cwes_from_text(text: str) -> List[str]:
+    if not text:
+        return []
+    cwes = re.findall(r"\bCWE-?([0-9]{1,5})\b", text, flags=re.IGNORECASE)
+    # Normalize to CWE-###
+    return [f"CWE-{cwe}" for cwe in cwes]
+
+
+def _extract_cves_from_text(text: str) -> List[str]:
+    if not text:
+        return []
+    return re.findall(r"\bCVE-[0-9]{4}-[0-9]{3,7}\b", text, flags=re.IGNORECASE)
+
+
+def _parse_ground_truth(upload) -> List[Dict]:
+    """Parse ground truth file (JSON list or object with 'vulnerabilities', or CSV)."""
+    filename = (upload.filename or "").lower()
+    data: List[Dict] = []
+    content = upload.read()
+    try:
+        upload.stream.seek(0)
+    except Exception:
+        pass
+    if filename.endswith(".json"):
+        try:
+            parsed = json.loads(content.decode("utf-8"))
+            if isinstance(parsed, dict) and "vulnerabilities" in parsed:
+                items = parsed.get("vulnerabilities") or []
+            elif isinstance(parsed, list):
+                items = parsed
+            else:
+                items = []
+            for it in items:
+                if isinstance(it, dict):
+                    data.append(it)
+        except Exception:
+            return []
+    elif filename.endswith(".csv"):
+        try:
+            text = content.decode("utf-8")
+            reader = csv.DictReader(io.StringIO(text))
+            for row in reader:
+                data.append(row)
+        except Exception:
+            return []
+    return data
+
+
+def _canonicalize_path(path_str: str, base_dir: str) -> str:
+    if not path_str:
+        return ""
+    p = os.path.abspath(os.path.join(base_dir, path_str)) if not os.path.isabs(path_str) else os.path.abspath(path_str)
+    # Try to strip base_dir for normalized comparison
+    try:
+        rel = os.path.relpath(p, base_dir)
+        return rel.replace("\\", "/").lower()
+    except Exception:
+        return p.replace("\\", "/").lower()
+
+
+def _normalize_cwe(cwe: Optional[str]) -> Optional[str]:
+    if not cwe:
+        return None
+    m = re.search(r"([0-9]{1,5})", str(cwe))
+    return f"CWE-{m.group(1)}" if m else None
+
+
+def _calculate_metrics_from_ground_truth(
+    predictions: List[Vulnerability], ground_truth: List[Dict], code_dir: str
+) -> Dict[str, float]:
+    # Build normalized GT entries
+    gt_entries: List[Dict] = []
+    for gt in ground_truth:
+        file_val = gt.get("fileName") or gt.get("file") or gt.get("path") or ""
+        line_val = gt.get("lineOfCode") or gt.get("line") or gt.get("start_line") or 0
+        cwe_val = gt.get("cwe") or gt.get("cwe_id") or gt.get("rule_id") or gt.get("type")
+        gt_entries.append(
+            {
+                "file": _canonicalize_path(str(file_val), code_dir),
+                "line": int(str(line_val) or 0) if str(line_val).strip() else 0,
+                "cwe": _normalize_cwe(cwe_val),
+                "type": (str(cwe_val) if _normalize_cwe(cwe_val) is None else None),
+            }
+        )
+    # Build normalized predictions
+    pred_entries: List[Dict] = []
+    for v in predictions:
+        pred_entries.append(
+            {
+                "file": _canonicalize_path(v.fileName, code_dir),
+                "line": int(v.lineOfCode or 0),
+                "cwe": _normalize_cwe(v.cwe),
+                "type": v.vulnerabilityType,
+            }
+        )
+
+    matched_gt = set()
+    tp = 0
+    for pred in pred_entries:
+        found = False
+        for i, gt in enumerate(gt_entries):
+            if i in matched_gt:
+                continue
+            if _match_pred_to_gt(pred, gt):
+                matched_gt.add(i)
+                tp += 1
+                found = True
+                break
+        # We count FP later implicitly
+    fp = max(0, len(pred_entries) - tp)
+    fn = max(0, len(gt_entries) - tp)
+    precision = tp / (tp + fp or 1)
+    recall = tp / (tp + fn or 1)
+    f1 = 2 * (precision * recall) / (precision + recall or 1)
+    acc = tp / (tp + fp + fn or 1)
+    return {
+        "f1Score": f1,
+        "precision": precision,
+        "recall": recall,
+        "detectionAccuracy": acc,
+    }
+
+
+def _match_pred_to_gt(pred: Dict, gt: Dict) -> bool:
+    # Require file equality
+    if pred.get("file") != gt.get("file"):
+        return False
+    # If both have line numbers, allow small window
+    pl = int(pred.get("line") or 0)
+    gl = int(gt.get("line") or 0)
+    if pl and gl and abs(pl - gl) > 3:
+        return False
+    # Prefer CWE match if present
+    pcwe = pred.get("cwe")
+    gcwe = gt.get("cwe")
+    if gcwe:
+        return pcwe == gcwe
+    # Fallback to type string match (case-insensitive)
+    ptype = (pred.get("type") or "").lower()
+    gtype = (gt.get("type") or "").lower()
+    if ptype and gtype:
+        return ptype == gtype
+    return True
+
+
+def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: int = 10) -> None:
+    """Best-effort enrichment using Gemini if GEMINI_API_KEY is set.
+    Populates explanation/suggestedFix when empty.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return
+    try:
+        import google.generativeai as genai
+    except Exception:
+        return
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel("gemini-1.5-flash")
+
+    count = 0
+    for v in vulns:
+        if count >= max_items:
+            break
+        needs_expl = not v.explanation
+        needs_fix = not v.suggestedFix
+        if not (needs_expl or needs_fix):
+            continue
+
+        snippet = _read_code_snippet(os.path.join(code_dir, v.fileName), v.lineOfCode)
+        prompt = (
+            "You are a secure code expert. Given the finding below and code snippet, "
+            "return a concise JSON with keys 'explanation' and 'suggestedFix'. "
+            "Keep each under 120 words.\n\n"
+            f"Finding: type={v.vulnerabilityType}, severity={v.severity}, cwe={v.cwe or ''}\n"
+            f"File: {v.fileName}:{v.lineOfCode}\n\n"
+            f"Code snippet:\n{snippet}\n"
+        )
+        try:
+            resp = model.generate_content(prompt)
+            text = getattr(resp, "text", None) or getattr(resp, "candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text")
+            if not text:
+                continue
+            # Try to parse JSON object
+            match = re.search(r"\{[\s\S]*\}", text)
+            if match:
+                try:
+                    obj = json.loads(match.group(0))
+                    if needs_expl and isinstance(obj.get("explanation"), str):
+                        v.explanation = obj.get("explanation")
+                    if needs_fix and isinstance(obj.get("suggestedFix"), str):
+                        v.suggestedFix = obj.get("suggestedFix")
+                        count += 1
+                        continue
+                except Exception:
+                    pass
+            # Fallback: split text heuristically
+            parts = text.split("Suggested fix:")
+            if needs_expl and parts:
+                v.explanation = parts[0].strip()[:600]
+            if needs_fix and len(parts) > 1:
+                v.suggestedFix = parts[1].strip()[:600]
+            count += 1
+        except Exception:
+            continue
+
+
+def _read_code_snippet(path: str, line: int, window: int = 6) -> str:
+    try:
+        # If given path is absolute already extracted, use as-is else try joining
+        p = path if os.path.isabs(path) else path
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            lines = f.readlines()
+        idx = max(0, (line - 1) - window)
+        end = min(len(lines), (line - 1) + window)
+        snippet = "".join(lines[idx:end])
+        return snippet
+    except Exception:
+        return "(source code unavailable)"
 
 
 if __name__ == "__main__":

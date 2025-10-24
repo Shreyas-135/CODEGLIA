@@ -1,4 +1,5 @@
 import { Upload, FileJson, AlertCircle } from 'lucide-react';
+import JSZip from 'jszip';
 import { useState, useRef } from 'react';
 import { UploadedFile, ScanReport } from '../types/vulnerability';
 
@@ -10,7 +11,10 @@ interface FileUploadProps {
 export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [groundTruthFile, setGroundTruthFile] = useState<File | null>(null);
+  const [enableAI, setEnableAI] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dirInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -73,7 +77,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
       if (isArchive(f.name)) {
         archives.push(f);
       } else {
-        await processFile(f, files);
+        // Detect optional ground truth by filename
+        if (isGroundTruth(f.name)) {
+          setGroundTruthFile(f);
+        } else {
+          await processFile(f, files);
+        }
       }
     }
 
@@ -120,9 +129,20 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     );
   };
 
+  const isGroundTruth = (name: string) => {
+    const lower = name.toLowerCase();
+    return lower.includes('ground') || lower.includes('truth') || lower.includes('labels');
+  };
+
   const uploadArchiveToBackend = async (file: File): Promise<ScanReport> => {
     const form = new FormData();
     form.append('file', file);
+    if (groundTruthFile) {
+      form.append('ground_truth', groundTruthFile);
+    }
+    if (enableAI) {
+      form.append('ai', '1');
+    }
     try {
       const res = await fetch('/api/scan', {
         method: 'POST',
@@ -137,6 +157,19 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     } catch (err) {
       throw err as Error;
     }
+  };
+
+  const zipDirectory = async (fileList: FileList): Promise<File> => {
+    const zip = new JSZip();
+    const root = zip.folder('src')!;
+    for (let i = 0; i < fileList.length; i++) {
+      const f = fileList[i] as any as File & { webkitRelativePath?: string };
+      const p = (f.webkitRelativePath || f.name).replace(/^[\/]+/, '');
+      const arr = new Uint8Array(await f.arrayBuffer());
+      root.file(p, arr);
+    }
+    const content = await zip.generateAsync({ type: 'uint8array' });
+    return new File([content], 'source.zip', { type: 'application/zip' });
   };
 
   return (
@@ -155,8 +188,27 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
           ref={fileInputRef}
           type="file"
           multiple
-          accept=".json,.zip,.tar,.tgz,.tar.gz"
+          accept=".json,.csv,.zip,.tar,.tgz,.tar.gz"
           onChange={handleFileInput}
+          className="hidden"
+        />
+        <input
+          ref={dirInputRef}
+          type="file"
+          // @ts-expect-error - webkitdirectory is non-standard but widely supported
+          webkitdirectory="true"
+          directory="true"
+          onChange={async (e) => {
+            const items = e.target.files;
+            if (!items) return;
+            try {
+              const archive = await zipDirectory(items);
+              const report = await uploadArchiveToBackend(archive);
+              onReportGenerated && onReportGenerated(report);
+            } catch (err: any) {
+              setError(err?.message || 'Failed to compress and upload folder.');
+            }
+          }}
           className="hidden"
         />
 
@@ -170,7 +222,7 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
               Upload Vulnerability Scan Results or Source Archive
             </h3>
             <p className="text-slate-600 mb-4">
-              Drag and drop JSON outputs (Bandit/Semgrep) or a .zip/.tar.gz of the source code
+              Drag and drop JSON outputs (Bandit/Semgrep), optional Ground Truth (.json/.csv), or a .zip/.tar.gz of the source code. You can also upload a folder.
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -178,11 +230,29 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
             >
               Select Files
             </button>
+            <button
+              onClick={() => dirInputRef.current?.click()}
+              className="ml-3 px-6 py-3 border-2 border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-semibold"
+            >
+              Upload Folder
+            </button>
           </div>
 
           <div className="flex items-center gap-3 text-sm text-slate-500">
             <FileJson className="w-5 h-5" />
-            <span>Supports JSON (Bandit/Semgrep) and archives for Flask backend scanning</span>
+            <span>Supports JSON (Bandit/Semgrep), Ground Truth (.json/.csv), archives or folders for backend scanning</span>
+          </div>
+
+          <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input type="checkbox" checked={enableAI} onChange={(e) => setEnableAI(e.target.checked)} />
+              <span className="text-slate-700 font-semibold">Enrich with Gemini (if configured)</span>
+            </label>
+            {groundTruthFile && (
+              <span className="text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
+                Ground Truth: {groundTruthFile.name}
+              </span>
+            )}
           </div>
         </div>
       </div>

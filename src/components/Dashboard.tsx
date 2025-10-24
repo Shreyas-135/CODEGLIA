@@ -1,7 +1,7 @@
 import { Shield, AlertTriangle, FileText, Download, Eye, Code2, FileSpreadsheet, Activity } from 'lucide-react';
 import { ScanReport } from '../types/vulnerability';
 import { generateHTMLReport, downloadReport } from '../utils/generateReport';
-import { generateExcelReport, generateCSVReport, downloadCSV } from '../utils/excelExport';
+import { generateExcelReport } from '../utils/excelExport';
 import { useState } from 'react';
 
 interface DashboardProps {
@@ -32,10 +32,7 @@ export function Dashboard({ report, onReset }: DashboardProps) {
     generateExcelReport(report, startupName);
   };
 
-  const handleDownloadCSV = () => {
-    const csv = generateCSVReport(report);
-    downloadCSV(csv, `GC_PS_01_${startupName}.csv`);
-  };
+  // CSV export is available via Excel flow; keep helper for future use
 
   const handleConfirmName = () => {
     setShowNameModal(false);
