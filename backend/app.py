@@ -35,6 +35,13 @@ CORS(app,
          "max_age": 3600
      }})
 
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "time": datetime.datetime.utcnow().isoformat()
+    })
+
 # Comprehensive after_request handler
 @app.after_request
 def after_request(response):
