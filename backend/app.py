@@ -408,6 +408,10 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
         if process.returncode not in (0, 1):
             return None
         return json.loads(process.stdout or "{}")
+    except FileNotFoundError:
+        return None
+    except Exception:
+        return None
 
 # ----------------------
 # Dependency Scanning (Python/Node)
