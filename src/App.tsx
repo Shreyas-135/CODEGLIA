@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { Dashboard } from './components/Dashboard';
-import { CompetitionInfo } from './components/CompetitionInfo';
 import { parseUploadedFiles } from './utils/parseVulnerabilities';
 import { ScanReport, UploadedFile } from './types/vulnerability';
 import { Shield } from 'lucide-react';
