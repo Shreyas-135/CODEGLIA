@@ -1,4 +1,4 @@
-import { Upload, FileJson, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileJson, AlertCircle, Loader2, Sparkles, Info } from 'lucide-react';
 import JSZip from 'jszip';
 import { useState, useRef } from 'react';
 import { UploadedFile, ScanReport } from '../types/vulnerability';
@@ -8,7 +8,6 @@ interface FileUploadProps {
   onReportGenerated?: (report: ScanReport) => void;
 }
 
-// Get backend URL from environment or use default
 const getBackendUrl = () => {
   const viteUrl = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_BASEAPP_URL;
   if (viteUrl) {
@@ -29,7 +28,8 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
   const [isUploading, setIsUploading] = useState(false);
   const [progressState, setProgressState] = useState<ProgressState | null>(null);
   const [groundTruthFile, setGroundTruthFile] = useState<File | null>(null);
-  const [enableAI, setEnableAI] = useState<boolean>(false);
+  const [enableAI, setEnableAI] = useState<boolean>(true); // Default to enabled
+  const [showAIInfo, setShowAIInfo] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dirInputRef = useRef<HTMLInputElement>(null);
 
@@ -160,13 +160,14 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
     if (enableAI) {
       form.append('ai', '1');
     }
-    form.append('streaming', '1'); // Enable streaming
+    form.append('streaming', '1');
     
     const backendUrl = getBackendUrl();
     const apiUrl = `${backendUrl}/api/scan`;
     
     console.log('Streaming upload to:', apiUrl);
     console.log('File size:', file.size, 'bytes');
+    console.log('AI Enrichment:', enableAI ? 'Enabled' : 'Disabled');
     
     try {
       const res = await fetch(apiUrl, {
@@ -189,7 +190,6 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         throw new Error(errorMsg);
       }
 
-      // Process Server-Sent Events stream
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       
@@ -209,9 +209,8 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
         
         buffer += decoder.decode(value, { stream: true });
         
-        // Process complete messages
         const lines = buffer.split('\n\n');
-        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+        buffer = lines.pop() || '';
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
@@ -404,20 +403,71 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
             <span>Supports JSON (Bandit/Semgrep), Ground Truth (.json/.csv), archives or folders for backend scanning</span>
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-            <label className="flex items-center gap-2 cursor-pointer select-none">
-              <input 
-                type="checkbox" 
-                checked={enableAI} 
-                onChange={(e) => setEnableAI(e.target.checked)}
-                disabled={isUploading}
-              />
-              <span className="text-slate-700 font-semibold">Enrich with Gemini (top 5 critical/high)</span>
-            </label>
+          <div className="mt-4 w-full max-w-md space-y-3">
+            {/* AI Enrichment Toggle */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-3 cursor-pointer select-none flex-1">
+                  <div className="relative">
+                    <input 
+                      type="checkbox" 
+                      checked={enableAI} 
+                      onChange={(e) => setEnableAI(e.target.checked)}
+                      disabled={isUploading}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className={`w-5 h-5 ${enableAI ? 'text-purple-600' : 'text-slate-400'}`} />
+                    <span className={`font-bold ${enableAI ? 'text-purple-900' : 'text-slate-600'}`}>
+                      AI-Powered Enrichment (Gemini)
+                    </span>
+                  </div>
+                </label>
+                <button
+                  onClick={() => setShowAIInfo(!showAIInfo)}
+                  className="p-1 hover:bg-purple-100 rounded transition-colors"
+                >
+                  <Info className="w-5 h-5 text-purple-600" />
+                </button>
+              </div>
+              
+              {showAIInfo && (
+                <div className="mt-3 pt-3 border-t border-purple-200 text-sm text-slate-700 space-y-2">
+                  <p className="flex items-start gap-2">
+                    <span className="text-purple-600 font-bold">•</span>
+                    <span><strong>Personalized Explanations:</strong> Get detailed explanations of why each vulnerability is dangerous</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-purple-600 font-bold">•</span>
+                    <span><strong>Code-Specific Fixes:</strong> Receive exact line numbers and code changes to fix issues</span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <span className="text-purple-600 font-bold">•</span>
+                    <span><strong>Context-Aware:</strong> AI analyzes your actual code for targeted recommendations</span>
+                  </p>
+                  <p className="text-xs text-slate-500 mt-2 italic">
+                    Note: Enriches up to 50 vulnerabilities per scan. Requires GEMINI_API_KEY on backend.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Ground Truth File Display */}
             {groundTruthFile && (
-              <span className="text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded">
-                Ground Truth: {groundTruthFile.name}
-              </span>
+              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 flex items-center gap-2">
+                <FileJson className="w-5 h-5 text-green-700" />
+                <span className="text-green-800 font-semibold text-sm flex-1">
+                  Ground Truth: {groundTruthFile.name}
+                </span>
+                <button
+                  onClick={() => setGroundTruthFile(null)}
+                  className="text-green-700 hover:text-green-900 text-sm font-bold"
+                >
+                  ✕
+                </button>
+              </div>
             )}
           </div>
           
@@ -449,6 +499,12 @@ export function FileUpload({ onFilesUploaded, onReportGenerated }: FileUploadPro
           <div className="flex items-center gap-2 text-xs text-blue-700">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Status: <strong>{progressState.status}</strong></span>
+            {enableAI && progressState.status === 'ai' && (
+              <span className="ml-2 flex items-center gap-1 text-purple-700">
+                <Sparkles className="w-3 h-3" />
+                <strong>AI enriching vulnerabilities...</strong>
+              </span>
+            )}
           </div>
         </div>
       )}
