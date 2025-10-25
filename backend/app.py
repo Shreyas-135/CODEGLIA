@@ -1120,7 +1120,31 @@ def _parse_pip_audit_json(data: Optional[dict], app_name: str, req_file_rel: str
             cwe=None,
             cve=cve,
             description=description,
-            explanation
+            description = vuln_obj.get("description") or vuln_obj.get("summary") or f"Vulnerability in {pkg_name}"
+        vtype = vuln_obj.get("id") or (aliases[0] if aliases else f"Vulnerable dependency: {pkg_name}")
+        return Vulnerability(
+            id=f"{req_file_rel}:{pkg_name}:{pkg_version}:pip-audit",
+            applicationName=app_name,
+            fileName=req_file_rel,
+            lineOfCode=0,
+            vulnerabilityType=str(vtype),
+            severity=severity,
+            cwe=None,
+            cve=cve,
+            description=description,
+            explanation=None,
+            suggestedFix=None,
+            language="Python",
+            tool="pip-audit",
+            confidenceLevel=None,
+        )
+
+    for dep in data.get("dependencies", []):
+        name = dep.get("name")
+        version = dep.get("version")
+        for vobj in dep.get("vulns", []) or []:
+            results.append(make_vuln(name, version, vobj))
+    return results
 def process_scan_results(results, filename):
     vulns = []
     for r in results:
