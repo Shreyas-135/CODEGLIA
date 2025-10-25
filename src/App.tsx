@@ -40,7 +40,6 @@ function App() {
 
         {!report ? (
           <>
-            <CompetitionInfo />
             <FileUpload onFilesUploaded={handleFilesUploaded} onReportGenerated={handleReportFromBackend} />
           </>
         ) : (
