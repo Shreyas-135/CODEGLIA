@@ -1087,62 +1087,7 @@ def _run_pip_audit(code_dir: str, requirements_path: str) -> Optional[dict]:
         return None
 
 
-def _parse_pip_audit_json(data: Optional[dict], app_name: str, req_file_rel: str) -> List[Vulnerability]:
-    if not data:
-        return []
-    results: List[Vulnerability] = []
-    
-    def make_vuln(pkg_name: str, pkg_version: str, vuln_obj: dict) -> Vulnerability:
-        cve: Optional[str] = None
-        vid = vuln_obj.get("id") or ""
-        aliases = vuln_obj.get("aliases") or []
-        if isinstance(aliases, list):
-            for al in aliases:
-                if isinstance(al, str) and al.upper().startswith("CVE-"):
-                    cve = al
-                    break
-        if not cve and isinstance(vid, str) and vid.upper().startswith("CVE-"):
-            cve = vid
 
-        sev = (vuln_obj.get("severity") or "").upper()
-        severity = _map_severity(sev or "LOW")
-        description = vuln_obj.get("description") or vuln_obj.get("summary") or f"Vulnerability in {pkg_name}"
-        vtype = vuln_obj.get("id") or (aliases[0] if aliases else f"Vulnerable dependency: {pkg_name}")
-        return Vulnerability(
-            id=f"{req_file_rel}:{pkg_name}:{pkg_version}:pip-audit",
-            applicationName=app_name,
-            fileName=req_file_rel,
-            lineOfCode=0,
-            vulnerabilityType=str(vtype),
-            severity=severity,
-            cwe=None,
-            cve=cve,
-            description=description,
-            description = vuln_obj.get("description") or vuln_obj.get("summary") or f"Vulnerability in {pkg_name}"
-        vtype = vuln_obj.get("id") or (aliases[0] if aliases else f"Vulnerable dependency: {pkg_name}")
-        return Vulnerability(
-            id=f"{req_file_rel}:{pkg_name}:{pkg_version}:pip-audit",
-            applicationName=app_name,
-            fileName=req_file_rel,
-            lineOfCode=0,
-            vulnerabilityType=str(vtype),
-            severity=severity,
-            cwe=None,
-            cve=cve,
-            description=description,
-            explanation=None,
-            suggestedFix=None,
-            language="Python",
-            tool="pip-audit",
-            confidenceLevel=None,
-        )
-
-    for dep in data.get("dependencies", []):
-        name = dep.get("name")
-        version = dep.get("version")
-        for vobj in dep.get("vulns", []) or []:
-            results.append(make_vuln(name, version, vobj))
-    return results
 def process_scan_results(results, filename):
     vulns = []
     for r in results:
