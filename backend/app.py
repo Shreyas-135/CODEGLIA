@@ -583,52 +583,50 @@ def _scan_dependencies(code_dir: str, app_name: str, vulns: List[Vulnerability],
 
 
 # Helper functions (unchanged from original)
-def _parse_bandit_json(data: Optional[dict], app_name: str) -> List[Vulnerability]:
-    if not data or "results" not in data:
+def _parse_pip_audit_json(data: Optional[dict], app_name: str, req_file_rel: str) -> List[Vulnerability]:
+    if not data:
         return []
-    vulns: List[Vulnerability] = []
-    for r in data.get("results", []):
-        filename = r.get("filename") or ""
-        line_no = r.get("line_number") or 0
-        issue_text = r.get("issue_text") or r.get("issue") or "Bandit finding"
-        severity = _map_severity(r.get("issue_severity") or r.get("severity"))
-        cwe = None
-        issue_cwe = r.get("issue_cwe")
-        if isinstance(issue_cwe, dict):
-            cwe = issue_cwe.get("id")
-        elif isinstance(issue_cwe, str):
-            cwe = issue_cwe
-        
-        vulns.append(
-            Vulnerability(
-                id=f"{filename}:{line_no}:bandit",
-                applicationName=app_name,
-                fileName=filename,
-                lineOfCode=int(line_no or 0),
-                vulnerabilityType=r.get("test_id") or r.get("issue_text") or "Unknown",
-                severity=severity,
-                cwe=cwe,
-                cve=r.get("cve") or None,
-                description=issue_text,
-                explanation=None,
-            suggestedFix=(", ".join(vuln_obj.get("fix_versions") or []) or None),
+    results: List[Vulnerability] = []
+    
+    def make_vuln(pkg_name: str, pkg_version: str, vuln_obj: dict) -> Vulnerability:
+        cve: Optional[str] = None
+        vid = vuln_obj.get("id") or ""
+        aliases = vuln_obj.get("aliases") or []
+        if isinstance(aliases, list):
+            for al in aliases:
+                if isinstance(al, str) and al.upper().startswith("CVE-"):
+                    cve = al
+                    break
+        if not cve and isinstance(vid, str) and vid.upper().startswith("CVE-"):
+            cve = vid
+
+        sev = (vuln_obj.get("severity") or "").upper()
+        severity = _map_severity(sev or "LOW")
+        description = vuln_obj.get("description") or vuln_obj.get("summary") or f"Vulnerability in {pkg_name}"
+        vtype = vuln_obj.get("id") or (aliases[0] if aliases else f"Vulnerable dependency: {pkg_name}")
+        return Vulnerability(
+            id=f"{req_file_rel}:{pkg_name}:{pkg_version}:pip-audit",
+            applicationName=app_name,
+            fileName=req_file_rel,
+            lineOfCode=0,
+            vulnerabilityType=str(vtype),
+            severity=severity,
+            cwe=None,
+            cve=cve,
+            description=description,
+            explanation=None,
+            suggestedFix=None,
             language="Python",
             tool="pip-audit",
             confidenceLevel=None,
         )
 
-    if isinstance(data, dict) and isinstance(data.get("dependencies"), list):
-        for dep in data.get("dependencies", []):
-            name = dep.get("name") or ""
-            version = dep.get("version") or ""
-            for vobj in dep.get("vulns", []) or []:
-                try:
-                    results.append(make_vuln(name, version, vobj))
-                except Exception:
-                    continue
-    
+    for dep in data.get("dependencies", []):
+        name = dep.get("name")
+        version = dep.get("version")
+        for vobj in dep.get("vulns", []) or []:
+            results.append(make_vuln(name, version, vobj))
     return results
-
 
 def _parse_requirements_txt(path: str) -> List[Tuple[str, str]]:
     pairs: List[Tuple[str, str]] = []
