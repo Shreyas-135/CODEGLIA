@@ -149,10 +149,19 @@ def root():
 @app.post("/api/scan")
 def scan_archive():
     """Accepts a code archive (.zip, .tar, .tar.gz) and runs security scanners with progress updates."""
-    
-    # Check if streaming is requested
-    streaming = request.form.get("streaming") == "1"
-    
+
+    # Check file size early
+    upload = request.files.get("file")
+    if upload:
+        upload.seek(0, os.SEEK_END)
+        file_size = upload.tell()
+        upload.seek(0)  # Reset file pointer
+        if file_size > 100 * 1024 * 1024:  # 100MB limit
+            return jsonify({"error": "File too large. Maximum size is 100MB."}), 413
+
+    # Enable streaming by default for large files (>10MB) or if explicitly requested
+    streaming = request.form.get("streaming") == "1" or file_size > 10 * 1024 * 1024
+
     if streaming:
         return Response(
             stream_with_context(_scan_with_progress()),
@@ -177,6 +186,13 @@ def _scan_synchronous():
         if not upload or not upload.filename:
             return jsonify({"error": "Invalid file upload."}), 400
 
+        # Check file size
+        upload.seek(0, os.SEEK_END)
+        file_size = upload.tell()
+        upload.seek(0)
+        if file_size > 100 * 1024 * 1024:  # 100MB limit
+            return jsonify({"error": "File too large. Maximum size is 100MB."}), 413
+
         ground_truth_upload = request.files.get("ground_truth")
         ai_enrich = (request.form.get("ai") or "").lower() in {"1", "true", "yes"}
         application_name = request.form.get("application_name") or Path(upload.filename).stem
@@ -191,6 +207,7 @@ def _scan_synchronous():
             try:
                 _extract_archive(archive_path, code_dir)
             except Exception as exc:
+                print(f"Extraction error: {exc}")
                 return jsonify({"error": f"Failed to extract archive: {exc}"}), 400
 
             file_count, languages = _collect_files_and_languages(code_dir)
@@ -205,10 +222,9 @@ def _scan_synchronous():
             # Dependency scanning (optimized - limit batch size)
             _scan_dependencies(code_dir, application_name, vulns, max_packages=50)
 
-            # AI enrichment - OPTIMIZED: only enrich high/critical, limit to 5
+            # AI enrichment - enrich all vulnerabilities with explanations and fixes
             if ai_enrich and vulns:
-                high_priority = [v for v in vulns if v.severity in ['CRITICAL', 'HIGH']]
-                _enrich_with_gemini(high_priority[:5], code_dir)
+                _enrich_with_gemini(vulns, code_dir)
 
             languages_from_vulns = {v.language for v in vulns if v.language and v.language != "Unknown"}
             languages = list(set(languages) | languages_from_vulns)
@@ -250,7 +266,7 @@ def _scan_synchronous():
             return jsonify(report.__dict__)
 
     except Exception as e:
-        print(f"ERROR in /api/scan: {str(e)}")
+        print(f"ERROR in /api/scan synchronous: {str(e)}")
         traceback.print_exc()
         return jsonify({
             "error": f"Internal server error: {str(e)}",
@@ -318,9 +334,8 @@ def _scan_with_progress():
 
             # Progress: AI enrichment (optional)
             if ai_enrich and vulns:
-                yield f"data: {json.dumps({'status': 'ai', 'message': 'Enriching with AI (top 5 critical/high)...', 'progress': 85})}\n\n"
-                high_priority = [v for v in vulns if v.severity in ['CRITICAL', 'HIGH']]
-                _enrich_with_gemini(high_priority[:5], code_dir)
+                yield f"data: {json.dumps({'status': 'ai', 'message': 'Enriching with AI (all vulnerabilities)...', 'progress': 85})}\n\n"
+                _enrich_with_gemini(vulns, code_dir)
 
             # Progress: Finalizing
             yield f"data: {json.dumps({'status': 'finalizing', 'message': 'Generating report...', 'progress': 95})}\n\n"
@@ -368,7 +383,7 @@ def _scan_with_progress():
     except Exception as e:
         print(f"ERROR in streaming scan: {str(e)}")
         traceback.print_exc()
-        yield f"data: {json.dumps({'error': f'Internal error: {str(e)}'})}\n\n"
+        yield f"data: {json.dumps({'error': f'Internal error: {str(e)}', 'type': type(e).__name__})}\n\n"
 
 
 def _scan_dependencies(code_dir: str, app_name: str, vulns: List[Vulnerability], max_packages: int = 50):
@@ -426,23 +441,63 @@ def _extract_archive(archive_path: str, target_dir: str) -> None:
     lower = archive_path.lower()
     if lower.endswith(".zip"):
         with zipfile.ZipFile(archive_path, "r") as zf:
-            _safe_extract_zip(zf, target_dir)
+            _safe_extract_zip_optimized(zf, target_dir)
     elif lower.endswith(".tar") or lower.endswith(".tar.gz") or lower.endswith(".tgz"):
         with tarfile.open(archive_path, "r:*") as tf:
-            _safe_extract_tar(tf, target_dir)
+            _safe_extract_tar_optimized(tf, target_dir)
     else:
         raise ValueError("Unsupported archive format. Use .zip or .tar(.gz)")
 
 
-def _safe_extract_zip(zf: zipfile.ZipFile, path: str) -> None:
+def _safe_extract_zip_optimized(zf: zipfile.ZipFile, path: str) -> None:
+    # Define non-code file extensions to skip
+    skip_extensions = {
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.ico',
+        '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
+        '.mp3', '.wav', '.flac', '.aac', '.ogg',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.zip', '.tar', '.gz', '.rar', '.7z',
+        '.exe', '.dll', '.so', '.dylib', '.bin',
+        '.log', '.tmp', '.cache'
+    }
+
     for member in zf.infolist():
         _validate_member_path(member.filename, path)
+        # Skip non-code files to reduce extraction time and memory
+        if any(member.filename.lower().endswith(ext) for ext in skip_extensions):
+            continue
+        # Skip hidden files and directories
+        if member.filename.startswith('.') or '/.' in member.filename:
+            continue
+        # Skip large files (>10MB each)
+        if member.file_size > 10 * 1024 * 1024:
+            continue
     zf.extractall(path)
 
 
-def _safe_extract_tar(tf: tarfile.TarFile, path: str) -> None:
+def _safe_extract_tar_optimized(tf: tarfile.TarFile, path: str) -> None:
+    # Define non-code file extensions to skip
+    skip_extensions = {
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.ico',
+        '.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm',
+        '.mp3', '.wav', '.flac', '.aac', '.ogg',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.zip', '.tar', '.gz', '.rar', '.7z',
+        '.exe', '.dll', '.so', '.dylib', '.bin',
+        '.log', '.tmp', '.cache'
+    }
+
     for member in tf.getmembers():
         _validate_member_path(member.name, path)
+        # Skip non-code files to reduce extraction time and memory
+        if any(member.name.lower().endswith(ext) for ext in skip_extensions):
+            continue
+        # Skip hidden files and directories
+        if member.name.startswith('.') or '/.' in member.name:
+            continue
+        # Skip large files (>10MB each)
+        if member.size > 10 * 1024 * 1024:
+            continue
     tf.extractall(path)
 
 
@@ -471,7 +526,7 @@ def _run_bandit(code_dir: str) -> Optional[dict]:
             stderr=subprocess.PIPE,
             check=False,
             text=True,
-            timeout=180,  # Reduced timeout
+            timeout=600,  # Increased timeout for large codebases
         )
         if process.returncode not in (0, 1):
             return None
@@ -498,7 +553,7 @@ def _run_semgrep(code_dir: str) -> Optional[dict]:
             stderr=subprocess.PIPE,
             check=False,
             text=True,
-            timeout=300,  # Reduced timeout
+            timeout=900,  # Increased timeout for large codebases
         )
         if process.returncode not in (0, 1):
             return None
@@ -923,14 +978,16 @@ def _match_pred_to_gt(pred: Dict, gt: Dict) -> bool:
     return True
 
 
-def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: int = 5) -> None:
-    """OPTIMIZED: Reduced to 5 items max"""
+def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: int = 50) -> None:
+    """Enrich vulnerabilities with AI-generated explanations and fixes using Gemini API"""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
+        print("GEMINI_API_KEY not set, skipping AI enrichment")
         return
     try:
         import google.generativeai as genai
-    except Exception:
+    except ImportError:
+        print("google-generativeai not installed, skipping AI enrichment")
         return
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash")
@@ -939,17 +996,19 @@ def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: in
     for v in vulns:
         if count >= max_items:
             break
-        needs_expl = not v.explanation
-        needs_fix = not v.suggestedFix
+        needs_expl = not v.explanation or v.explanation.startswith("http")  # Replace HTML links
+        needs_fix = not v.suggestedFix or v.suggestedFix.startswith("http")  # Replace HTML links
         if not (needs_expl or needs_fix):
             continue
 
         snippet = _read_code_snippet(os.path.join(code_dir, v.fileName), v.lineOfCode)
         prompt = (
-            "You are a secure code expert. Given the finding below and code snippet, "
-            "return a concise JSON with keys 'explanation' and 'suggestedFix'. "
-            "Keep each under 120 words.\n\n"
+            "You are a secure code expert. Given the vulnerability finding below and code snippet, "
+            "provide a concise explanation of the vulnerability and a suggested fix. "
+            "Return a JSON with keys 'explanation' and 'suggestedFix'. "
+            "Keep each under 150 words.\n\n"
             f"Finding: type={v.vulnerabilityType}, severity={v.severity}, cwe={v.cwe or ''}\n"
+            f"Description: {v.description}\n"
             f"File: {v.fileName}:{v.lineOfCode}\n\n"
             f"Code snippet:\n{snippet}\n"
         )
@@ -958,25 +1017,28 @@ def _enrich_with_gemini(vulns: List[Vulnerability], code_dir: str, max_items: in
             text = getattr(resp, "text", None)
             if not text:
                 continue
+            # Extract JSON from response
             match = re.search(r"\{[\s\S]*\}", text)
             if match:
                 try:
                     obj = json.loads(match.group(0))
                     if needs_expl and isinstance(obj.get("explanation"), str):
-                        v.explanation = obj.get("explanation")
+                        v.explanation = obj.get("explanation").strip()
                     if needs_fix and isinstance(obj.get("suggestedFix"), str):
-                        v.suggestedFix = obj.get("suggestedFix")
+                        v.suggestedFix = obj.get("suggestedFix").strip()
                     count += 1
                     continue
-                except Exception:
+                except json.JSONDecodeError:
                     pass
-            parts = text.split("Suggested fix:")
-            if needs_expl and parts:
-                v.explanation = parts[0].strip()[:600]
+            # Fallback: parse text response
+            parts = text.split("Suggested fix:", 1)
+            if needs_expl and len(parts) > 0:
+                v.explanation = parts[0].replace("Explanation:", "").strip()[:600]
             if needs_fix and len(parts) > 1:
                 v.suggestedFix = parts[1].strip()[:600]
             count += 1
-        except Exception:
+        except Exception as e:
+            print(f"Error enriching vulnerability {v.id}: {e}")
             continue
 
 
