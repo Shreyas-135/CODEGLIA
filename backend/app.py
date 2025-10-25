@@ -1016,21 +1016,6 @@ def _read_code_snippet(path: str, line: int, window: int = 6) -> str:
         return "(source code unavailable)"
 
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    print(f"Starting backend server on port {port}...")
-    print(f"Health check: http://localhost:{port}/health")
-    print(f"API endpoint: http://localhost:{port}/api/scan")
-    app.run(host="0.0.0.0", port=port, debug=False)=r.get("more_info"),
-                suggestedFix=r.get("fix") or r.get("recommendation"),
-                language=_detect_language(filename),
-                tool="bandit",
-                confidenceLevel=r.get("issue_confidence") or r.get("confidence"),
-            )
-        )
-    return vulns
-
-
 def _parse_semgrep_json(data: Optional[dict], app_name: str) -> List[Vulnerability]:
     if not data or "results" not in data:
         return []
@@ -1136,3 +1121,28 @@ def _parse_pip_audit_json(data: Optional[dict], app_name: str, req_file_rel: str
             cve=cve,
             description=description,
             explanation
+def process_scan_results(results, filename):
+    vulns = []
+    for r in results:
+        vulns.append(
+            Vulnerability(
+                file=filename,
+                line=r.get("line_number"),
+                message=r.get("issue_text"),
+                severity=r.get("issue_severity"),
+                moreInfo=r.get("more_info"),
+                suggestedFix=r.get("fix") or r.get("recommendation"),
+                language=_detect_language(filename),
+                tool="bandit",
+                confidenceLevel=r.get("issue_confidence") or r.get("confidence"),
+            )
+        )
+    return vulns
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    print(f"Starting backend server on port {port}...")
+    print(f"Health check: http://localhost:{port}/health")
+    print(f"API endpoint: http://localhost:{port}/api/scan")
+    app.run(host="0.0.0.0", port=port, debug=False)
