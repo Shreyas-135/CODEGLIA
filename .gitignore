@@ -1,0 +1,49 @@
+# Environment variables
+.env
+
+# Python cache and virtual environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+
+# Output and scan results
+output/
+scans/
+*.json
+
+
+# Ignore Bandit and Semgrep outputs
+bandit_output.json
+semgrep_output.json
+
+# Ignore AI/Scan cache files
+.cache.json
+.cwe_cache.json
+
+# Ignore performance and scan reports
+performance.json
+scan_report.html
+scan_report.json
+
+# Ignore screenshots and temporary media
+*.png
+*.jpg
+*.jpeg
+
+# Ignore temp files
+*.tmp
+*.bak
+
+# Docker artifacts
+*.log
+*.pid
+
+# VSCode and system files
+.vscode/
+.DS_Store
+
+# Semgrep rule sets (keep locally, ignore in GitHub)
+
+semgrep-rules.zip

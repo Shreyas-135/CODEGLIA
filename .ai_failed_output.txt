@@ -1,0 +1,766 @@
+
+--- 20251025-145818 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+
+Analyze this code vulnerability:
+
+File: datasets/uploaded_project/test_vuln.java
+Line: 8
+Issue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.
+Code:
+MessageDigest md = MessageDigest.getInstance("MD5");
+
+Explain in 3–4 sentences what the vulnerability is, why it's risky, and how to fix it.
+Provide the output strictly in JSON format:
+{
+  "explanation": "...",
+  "fix": "..."
+}
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-145830 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+
+Analyze this code vulnerability:
+
+File: datasets/uploaded_project/test_vuln.js
+Line: 5
+Issue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.
+Code:
+eval(input);
+
+Explain in 3–4 sentences what the vulnerability is, why it's risky, and how to fix it.
+Provide the output strictly in JSON format:
+{
+  "explanation": "...",
+  "fix": "..."
+}
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150151 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.java\nLine: 8\nIssue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.\nCode:\nMessageDigest md = MessageDigest.getInstance("MD5");\n\nExplain in 3\u20134 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150201 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.js\nLine: 5\nIssue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.\nCode:\neval(input);\n\nExplain in 3\u20134 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150446 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.java\nLine: 8\nIssue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.\nCode:\n```MessageDigest md = MessageDigest.getInstance(\\"MD5\\");```\n\nExplain in 3\u20134 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150455 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.js\nLine: 5\nIssue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.\nCode:\n```eval(input);```\n\nExplain in 3\u20134 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150750 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.java\nLine: 8\nIssue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.\nCode:\n```MessageDigest md = MessageDigest.getInstance(\\"MD5\\");```\n\nExplain in 3-4 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-150757 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+\nAnalyze this code vulnerability:\n\nFile: datasets/uploaded_project/test_vuln.js\nLine: 5\nIssue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.\nCode:\n```eval(input);```\n\nExplain in 3-4 sentences what the vulnerability is, why it's risky, and how to fix it.\nProvide the output strictly in JSON format:\n{\n  "explanation": "...",\n  "fix": "..."\n}\n
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 433, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-152811 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.java
+Line: 8
+Issue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.
+Code:
+MessageDigest md = MessageDigest.getInstance("MD5");
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 434, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-152819 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.js
+Line: 5
+Issue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.
+Code:
+eval(input);
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 434, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-153114 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.java
+Line: 8
+Issue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.
+Code:
+MessageDigest md = MessageDigest.getInstance("MD5");
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 438, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-153123 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.js
+Line: 5
+Issue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.
+Code:
+eval(input);
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 438, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-153408 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.java
+Line: 8
+Issue: Detected MD5 hash algorithm which is considered insecure. MD5 is not collision resistant and is therefore not suitable as a cryptographic signature. Use HMAC instead.
+Code:
+MessageDigest md = MessageDigest.getInstance("MD5");
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 438, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---
+
+--- 20251025-153420 ---
+Prompt:
+
+You are a cybersecurity expert.
+
+Analyze the following vulnerability and respond ONLY with a SINGLE JSON object
+containing exactly these two fields:
+- "explanation": (a short paragraph explaining the specific vulnerability)
+- "fix": (a code snippet showing the secure fix)
+
+Never return arrays, multiple objects, or extra commentary. Return exactly one JSON object.
+
+Example:
+{"explanation": "SQL injection occurs because...", "fix": "Use parameterized queries..."}
+
+Vulnerability:
+Source: Semgrep
+File: datasets/uploaded_project/test_vuln.js
+Line: 5
+Issue: Detected the use of eval(). eval() can be dangerous if used to evaluate dynamic content. If this content can be input from outside the program, this may be a code injection vulnerability. Ensure evaluated content is not definable by external sources.
+Code:
+eval(input);
+
+
+Exception:
+Traceback (most recent call last):
+  File "/Users/gokul/Desktop/Programs/Python/Demo/parse_results.py", line 438, in get_ai_analysis_batch
+    match = re.search(r'\{(?:[^{}]|(?R))*\}', text)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_compiler.py", line 748, in compile
+    p = _parser.parse(p, flags)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 980, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 863, in _parse
+    p = _parse_sub(source, state, sub_verbose, nested + 1)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 459, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/re/_parser.py", line 850, in _parse
+    raise source.error("unknown extension ?" + char,
+                       len(char) + 1)
+re.PatternError: unknown extension ?R at position 12
+
+---

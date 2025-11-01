@@ -1,0 +1,28 @@
+source venv/bin/activate
+export GEMINI_API_KEY="AIzaSyCG5--SNDyWFUHTyjN68Qd40Ef-wVOWbqg"
+python run_scan.py
+python app.py
+python evaluate_on_labels.py ground_truth.csv output/scan_report.json
+python generate_ps01_excel.py output/scan_report.json evaluation/evaluation_summary.txt
+docker run -it -p 8080:8080 -v "$(pwd)":/app codeglia
+
+# 🧠 CodeGlia – AI-Powered Multi-Language Vulnerability Scanner
+
+CodeGlia is an AI-augmented vulnerability detection platform integrating **Bandit**, **Semgrep**, and **Google Gemini API** for multi-language code analysis.  
+It generates interactive HTML dashboards, CVE mappings, and a "Trust Score" metric to quantify code security.
+
+---
+
+## 🚀 Quick Setup Guide
+
+### 1️⃣ Prerequisites
+- Python 3.10 or above
+- Git
+- Docker (optional, for containerized runs)
+
+### 2️⃣ Clone & Setup Virtual Environment
+```bash
+git clone https://github.com/your-repo-name/CodeGlia.git
+cd CodeGlia
+python3 -m venv venv
+source venv/bin/activate  # (or venv\Scripts\activate on Windows)
