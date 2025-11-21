@@ -105,5 +105,3 @@ CodeGlia can be deployed easily on:
 
 Each instance supports `.env` for secure API key handling.
 
- 
-> — CodeGlia Team
