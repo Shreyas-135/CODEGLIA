@@ -39,8 +39,8 @@ It allows developers to upload entire projects (ZIP or folder), scans the source
 
 ### **Option 1 – Using Python**
 ```bash
-git clone https://github.com/YOUR_USERNAME/CodeGlia.git
-cd CodeGlia
+git clone https://github.com/Shreyas-135/CODEGLIA.git
+cd CODEGLIA
 pip install -r requirements.txt
 flask run
 ```
@@ -105,13 +105,5 @@ CodeGlia can be deployed easily on:
 
 Each instance supports `.env` for secure API key handling.
 
----
-
-## 👨‍💻 Developer
-
-**Author:** Gokulakrishnan M  
-**Focus:** Secure AI-assisted DevOps Tools
-
----
  
 > — CodeGlia Team
