@@ -1125,6 +1125,16 @@ def save_html_report(report, filename="scan_report.html"):
     output_dir = "output"
 
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Load performance data if available
+    performance_data = {}
+    performance_path = os.path.join(output_dir, "performance.json")
+    if os.path.exists(performance_path):
+        try:
+            with open(performance_path, 'r', encoding='utf-8') as f:
+                performance_data = json.load(f)
+        except Exception:
+            pass
 
     html = []
 
@@ -1146,14 +1156,146 @@ def save_html_report(report, filename="scan_report.html"):
         .ai-fix { background: #dcedc8; padding: 0.75em; border-radius: 6px; margin: 0.4em 0 0.7em 0; white-space: pre-wrap; font-family: monospace; border-left: 5px solid #558b2f; font-size: 1.05em; }
         .vuln-label { font-weight: bold; color: #333; }
         .vuln-section { margin-bottom: 0.5em; }
+        .scanner-badge { 
+            display: inline-block; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            font-size: 0.85em; 
+            font-weight: bold; 
+            margin-left: 8px;
+        }
+        .scanner-bandit { background: #ffecb3; color: #f57f17; }
+        .scanner-semgrep { background: #c8e6c9; color: #2e7d32; }
+        .scanner-llm { background: #e1bee7; color: #6a1b9a; }
+        .performance-section {
+            background: #fff;
+            border: 2px solid #1976d2;
+            border-radius: 8px;
+            padding: 1.5em;
+            margin: 2em 0;
+        }
+        .perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+        .perf-table th, .perf-table td {
+            padding: 0.75em;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .perf-table th {
+            background: #1976d2;
+            color: white;
+            font-weight: bold;
+        }
+        .perf-table tr:hover {
+            background: #f5f5f5;
+        }
+        .perf-bar {
+            background: #e0e0e0;
+            border-radius: 4px;
+            height: 30px;
+            position: relative;
+            margin: 0.5em 0;
+        }
+        .perf-bar-fill {
+            background: linear-gradient(90deg, #1976d2, #42a5f5);
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            transition: width 0.5s;
+        }
     </style></head><body>""")
 
     html.append("<h1>CodeGlia Scan Report</h1>")
     # Metadata section
     html.append("<div class='metadata'>")
     html.append(f"<b>Scan Date:</b> {report.get('scan_metadata', {}).get('timestamp', '')}<br>")
-    html.append("<b>Tool Versions:</b> Bandit / Semgrep (latest)<br>")
+    html.append("<b>Tool Versions:</b> Bandit / Semgrep / LLM (latest)<br>")
     html.append("<b>CWE/CVE Mode:</b> Dynamic via MITRE + NVD (cached)</div><br>")
+    
+    # Performance Comparison Section
+    if performance_data and performance_data.get("scanners"):
+        html.append("<div class='performance-section'>")
+        html.append("<h2>📊 Performance Comparison</h2>")
+        
+        scanners = performance_data.get("scanners", {})
+        comparison = performance_data.get("comparison", {})
+        
+        # Summary metrics
+        html.append("<div style='margin: 1em 0;'>")
+        html.append(f"<b>Total Lines of Code:</b> {performance_data.get('total_lines_of_code', 0):,}<br>")
+        html.append(f"<b>Total Scan Time:</b> {performance_data.get('elapsed_scan_time_seconds', 0):.2f}s<br>")
+        html.append("</div>")
+        
+        # Scanner performance table
+        html.append("<table class='perf-table'>")
+        html.append("<thead><tr>")
+        html.append("<th>Scanner</th>")
+        html.append("<th>Time (s)</th>")
+        html.append("<th>Vulnerabilities</th>")
+        html.append("<th>Throughput (lines/s)</th>")
+        html.append("<th>Model/Backend</th>")
+        html.append("</tr></thead><tbody>")
+        
+        for scanner_name, scanner_data in scanners.items():
+            time_s = scanner_data.get("time_seconds", 0)
+            vulns = scanner_data.get("vulnerabilities_found", 0)
+            throughput = scanner_data.get("lines_per_second", 0)
+            model = scanner_data.get("model", scanner_data.get("backend", "-"))
+            
+            html.append("<tr>")
+            html.append(f"<td><b>{scanner_name.upper()}</b></td>")
+            html.append(f"<td>{time_s:.2f}</td>")
+            html.append(f"<td>{vulns}</td>")
+            html.append(f"<td>{throughput:.1f}</td>")
+            html.append(f"<td>{model}</td>")
+            html.append("</tr>")
+        
+        html.append("</tbody></table>")
+        
+        # Visual comparison bars
+        if scanners:
+            html.append("<h3>Time Comparison</h3>")
+            max_time = max(s.get("time_seconds", 0) for s in scanners.values())
+            
+            for scanner_name, scanner_data in scanners.items():
+                time_s = scanner_data.get("time_seconds", 0)
+                width_pct = (time_s / max_time * 100) if max_time > 0 else 0
+                
+                html.append(f"<div style='margin: 1em 0;'><b>{scanner_name.upper()}</b></div>")
+                html.append("<div class='perf-bar'>")
+                html.append(f"<div class='perf-bar-fill' style='width: {width_pct}%'>{time_s:.2f}s</div>")
+                html.append("</div>")
+        
+        # Comparison insights
+        if comparison:
+            html.append("<h3>Comparison Insights</h3>")
+            html.append("<div style='padding: 1em; background: #f5f5f5; border-radius: 6px;'>")
+            
+            static_time = comparison.get("static_total_time", 0)
+            llm_time = comparison.get("llm_total_time", 0)
+            
+            if static_time > 0 and llm_time > 0:
+                factor = comparison.get("llm_slower_by_factor", 0)
+                diff = comparison.get("llm_slower_by_seconds", 0)
+                
+                html.append(f"<b>Static Analysis Total:</b> {static_time:.2f}s<br>")
+                html.append(f"<b>LLM Analysis Total:</b> {llm_time:.2f}s<br>")
+                
+                if diff > 0:
+                    html.append(f"<b>Difference:</b> LLM is {factor:.1f}x slower (+{diff:.1f}s)<br>")
+                else:
+                    html.append(f"<b>Difference:</b> LLM is {1/factor:.1f}x faster ({abs(diff):.1f}s)<br>")
+        
+        html.append("</div></div></div>")
+    
     html.append(f"<div class='score'>Trust Score: <b>{report['summary']['trust_score']}</b></div>")
     # --- Trust explanation details block ---
     trust_expl = report['summary'].get('trust_explanation', {})
@@ -1195,8 +1337,14 @@ def save_html_report(report, filename="scan_report.html"):
         elif sev == "warning" or sev == "info":
             display_sev = "low"
         sev_class = f"severity-{display_sev}" if display_sev in ("high", "medium", "low") else ""
+        
+        # Scanner badge
+        scanner = v.get("scanner", "Unknown")
+        scanner_class = f"scanner-{scanner.lower()}" if scanner.lower() in ["bandit", "semgrep", "llm"] else "scanner-bandit"
+        scanner_badge = f"<span class='scanner-badge {scanner_class}'>{scanner}</span>"
+        
         html.append("<div class='vuln'>")
-        html.append(f"<div class='vuln-section'><span class='vuln-label'>File:</span> {v.get('file', '')}{occ_label} &nbsp; <span class='vuln-label'>Line:</span> {v.get('line', '')} &nbsp; <span class='{sev_class}'>{display_sev.upper()}</span></div>")
+        html.append(f"<div class='vuln-section'><span class='vuln-label'>File:</span> {v.get('file', '')}{occ_label} &nbsp; <span class='vuln-label'>Line:</span> {v.get('line', '')} &nbsp; <span class='{sev_class}'>{display_sev.upper()}</span>{scanner_badge}</div>")
         # CWE and CVE with links and titles (CWE title always beside ID, always fetch title if missing)
         cwe = v.get("cwe", "N/A")
         cwe_title = v.get("cwe_title", "")
@@ -1261,7 +1409,82 @@ def save_html_report(report, filename="scan_report.html"):
 
 
 
+def parse_llm_results(file_path: str):
+    """Parse LLM scanner JSON report, returns list of structured vulnerabilities."""
+    print("\n L L M  R E S U L T S \n" + "=" * 40)
+    vulns = []
+    
+    try:
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"⚠️ LLM results file not found at: {file_path}")
+        return []
+    except json.JSONDecodeError:
+        print(f"⚠️ Could not decode JSON from the LLM file: {file_path}")
+        return []
+    
+    vulnerabilities = data.get('results', [])
+    if not vulnerabilities:
+        print("✅ No vulnerabilities found by LLM.")
+        return []
+    
+    # Process LLM vulnerabilities
+    for i, vuln in enumerate(vulnerabilities, 1):
+        filename = vuln.get('file')
+        line_number = vuln.get('line')
+        issue_text = vuln.get('issue_text')
+        severity = vuln.get('severity')
+        cwe = vuln.get('cwe', 'N/A')
+        
+        print(f"--- LLM Vulnerability #{i} ---")
+        print(f"  File: {filename}")
+        print(f"  Line: {line_number}")
+        print(f"  Severity: {severity}")
+        print(f"  Issue: {issue_text}")
+        print(f"  CWE: {cwe}")
+        
+        # Get CWE title if available
+        cwe_title = ""
+        if cwe and cwe != "N/A" and re.match(r"CWE-\d+", cwe):
+            cwe_info = get_cwe_details(cwe)
+            cwe_title = cwe_info.get("title", "")
+        
+        # Get CVE mapping if available
+        cve_id = "No known CVE mapping available"
+        if cwe and cwe != "N/A":
+            cve_list = CVE_MAP_BY_CWE.get(cwe, [])
+            if cve_list:
+                # Choose most recent CVE
+                def choose_cve_by_most_recent(cves):
+                    try:
+                        return sorted(cves, key=lambda c: int(c.split('-')[1]), reverse=True)[0]
+                    except Exception:
+                        return cves[0]
+                cve_id = choose_cve_by_most_recent(cve_list)
+        
+        vuln["cwe_title"] = cwe_title
+        vuln["cve"] = cve_id
+        vuln["scanner"] = "LLM"
+        
+        # Ensure ai_explanation is in proper format
+        if "ai_explanation" not in vuln:
+            vuln["ai_explanation"] = {
+                "explanation": vuln.get("explanation", ""),
+                "fix": vuln.get("fix", "")
+            }
+        
+        vulns.append(vuln)
+        print("-" * 40)
+    
+    return vulns
+
+
 if __name__ == "__main__":
+    import sys as _sys
+    
+    # Check for --include-llm flag
+    include_llm = "--include-llm" in _sys.argv
 
     # Look for outputs in common folders (allows 'scans' or 'outputs')
 
@@ -1270,12 +1493,16 @@ if __name__ == "__main__":
     bandit_file = None
 
     semgrep_file = None
+    
+    llm_file = None
 
     for d in candidates:
 
         b = os.path.join(d, 'bandit_output.json')
 
         s = os.path.join(d, 'semgrep_output.json')
+        
+        l = os.path.join(d, 'llm_output.json')
 
         if bandit_file is None and os.path.exists(b):
 
@@ -1284,6 +1511,10 @@ if __name__ == "__main__":
         if semgrep_file is None and os.path.exists(s):
 
             semgrep_file = s
+        
+        if llm_file is None and os.path.exists(l):
+            
+            llm_file = l
 
 
     # If neither was found, default to the 'scans' filenames so user sees the expected path in errors
@@ -1295,11 +1526,20 @@ if __name__ == "__main__":
     if semgrep_file is None:
 
         semgrep_file = os.path.join('scans', 'semgrep_output.json')
+    
+    if llm_file is None:
+        
+        llm_file = os.path.join('scans', 'llm_output.json')
 
 
     print(f"Using Bandit file: {bandit_file}")
 
-    print(f"Using Semgrep file: {semgrep_file}\n")
+    print(f"Using Semgrep file: {semgrep_file}")
+    
+    if include_llm:
+        print(f"Using LLM file: {llm_file}")
+    
+    print()
 
 
     bandit_vulns = parse_bandit_results(bandit_file)
@@ -1307,6 +1547,12 @@ if __name__ == "__main__":
     print("\n" * 2)
 
     semgrep_vulns = parse_semgrep_results(semgrep_file)
+    
+    llm_vulns = []
+    
+    if include_llm:
+        print("\n" * 2)
+        llm_vulns = parse_llm_results(llm_file)
 
 
     all_vulns = []
@@ -1318,6 +1564,10 @@ if __name__ == "__main__":
     if semgrep_vulns:
 
         all_vulns.extend(semgrep_vulns)
+    
+    if llm_vulns:
+        
+        all_vulns.extend(llm_vulns)
 
 
     # Normalize severity for all_vulns before summary generation

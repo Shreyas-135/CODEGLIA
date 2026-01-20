@@ -21,6 +21,7 @@ semgrep_output.json
 # Ignore AI/Scan cache files
 .cache.json
 .cwe_cache.json
+.llm_scan_cache.json
 
 # Ignore performance and scan reports
 performance.json
