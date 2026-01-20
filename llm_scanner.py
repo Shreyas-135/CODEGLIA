@@ -81,6 +81,16 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
     
     def _init_backend(self):
         """Initialize the selected backend."""
+        # Don't actually initialize until we need to scan
+        # This allows the module to be imported without dependencies
+        self.client = None
+        self._backend_initialized = False
+    
+    def _ensure_backend_initialized(self):
+        """Lazy initialization of backend when needed."""
+        if self._backend_initialized:
+            return
+        
         if self.backend == "gemini":
             import google.generativeai as genai
             api_key = os.getenv("GEMINI_API_KEY")
@@ -110,6 +120,8 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
         
         else:
             raise ValueError(f"Unsupported backend: {self.backend}. Choose 'gemini', 'openai', or 'ollama'")
+        
+        self._backend_initialized = True
     
     def _load_cache(self) -> dict:
         """Load cache from file."""
@@ -175,6 +187,9 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
         if self.cache_enabled and cache_key in self.cache:
             print(f"[LLM] Cache hit for {filename}")
             return self.cache[cache_key]
+        
+        # Ensure backend is initialized
+        self._ensure_backend_initialized()
         
         language = self._get_language_from_file(filename)
         prompt = self.SECURITY_PROMPT_TEMPLATE.format(
