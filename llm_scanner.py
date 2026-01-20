@@ -20,6 +20,9 @@ class LLMScanner:
     SUPPORTED_EXTENSIONS = ['.py', '.js', '.java', '.php', '.c', '.cpp', '.h', '.hpp', 
                            '.cs', '.rb', '.pl', '.go', '.rs', '.ts', '.jsx', '.tsx']
     
+    # Configuration constants
+    MAX_LINES_PER_CHUNK = 4000  # Maximum lines to analyze in one chunk
+    
     SECURITY_PROMPT_TEMPLATE = """Analyze the following code for security vulnerabilities.
 
 File: {filename}
@@ -101,12 +104,11 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
         
         elif self.backend == "openai":
             try:
-                import openai
+                from openai import OpenAI
                 api_key = os.getenv("OPENAI_API_KEY")
                 if not api_key:
                     raise ValueError("OPENAI_API_KEY environment variable not set")
-                openai.api_key = api_key
-                self.client = openai
+                self.client = OpenAI(api_key=api_key)
             except ImportError:
                 raise ImportError("openai package not installed. Install with: pip install openai>=1.12.0")
         
@@ -204,7 +206,7 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
                 result_text = response.text.strip()
             
             elif self.backend == "openai":
-                response = self.client.ChatCompletion.create(
+                response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[
                         {"role": "system", "content": "You are a senior security engineer analyzing code for vulnerabilities."},
@@ -326,13 +328,13 @@ Example: [{{"line": 10, "severity": "high", "issue_text": "SQL Injection", "cwe"
         if not code:
             return []
         
-        # Handle large files by chunking (max ~4000 lines per chunk)
+        # Handle large files by chunking
         lines = code.split('\n')
-        if len(lines) > 4000:
+        if len(lines) > self.MAX_LINES_PER_CHUNK:
             print(f"⚠️ File {filepath} is large ({len(lines)} lines), chunking...")
-            # For now, just analyze first 4000 lines
+            # For now, just analyze first MAX_LINES_PER_CHUNK lines
             # TODO: Implement smarter chunking that focuses on critical functions
-            code = '\n'.join(lines[:4000])
+            code = '\n'.join(lines[:self.MAX_LINES_PER_CHUNK])
         
         return self._analyze_with_llm(code, filepath)
     
