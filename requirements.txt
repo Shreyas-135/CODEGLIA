@@ -9,6 +9,7 @@ lxml==5.2.2
 jinja2==3.1.4
 markdown==3.6
 google-generativeai>=0.3.0
+gunicorn==21.2.0
 # Optional LLM backend dependencies
 # Uncomment if using OpenAI backend:
 # openai>=1.12.0
